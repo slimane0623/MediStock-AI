@@ -34,7 +34,6 @@ type InventoryItem = {
   name: string
   dosage: string
   form: string
-  profileId: number | null
   profile: string
   quantity: number
   unit: string
@@ -102,10 +101,10 @@ const profiles: Profile[] = [
 ]
 
 const inventory: InventoryItem[] = [
-  { id: 1, name: 'Doliprane', dosage: '1000 mg', form: 'Comprime', profileId: 1, profile: 'Danil', quantity: 16, unit: 'comprimes', expiryDate: '2026-06-14', threshold: 4, location: 'Cuisine', notes: 'Boite entamee' },
-  { id: 2, name: 'Metformine', dosage: '500 mg', form: 'Comprime', profileId: 2, profile: 'Slim', quantity: 8, unit: 'comprimes', expiryDate: '2026-03-29', threshold: 5, location: 'Salon', notes: 'Renouvellement proche' },
-  { id: 3, name: 'Levothyrox', dosage: '75 ug', form: 'Comprime', profileId: 3, profile: 'Mamie Jeanne', quantity: 0, unit: 'comprimes', expiryDate: '2026-04-06', threshold: 2, location: 'Boite senior', notes: 'Rupture' },
-  { id: 4, name: 'Amoxicilline', dosage: '500 mg', form: 'Gelule', profileId: 1, profile: 'Danil', quantity: 10, unit: 'gelules', expiryDate: '2026-03-20', threshold: 3, location: 'Salle de bain', notes: 'Traitement en cours' },
+  { id: 1, name: 'Doliprane', dosage: '1000 mg', form: 'Comprime', profile: 'Danil', quantity: 16, unit: 'comprimes', expiryDate: '2026-06-14', threshold: 4, location: 'Cuisine', notes: 'Boite entamee' },
+  { id: 2, name: 'Metformine', dosage: '500 mg', form: 'Comprime', profile: 'Slim', quantity: 8, unit: 'comprimes', expiryDate: '2026-03-29', threshold: 5, location: 'Salon', notes: 'Renouvellement proche' },
+  { id: 3, name: 'Levothyrox', dosage: '75 ug', form: 'Comprime', profile: 'Mamie Jeanne', quantity: 0, unit: 'comprimes', expiryDate: '2026-04-06', threshold: 2, location: 'Boite senior', notes: 'Rupture' },
+  { id: 4, name: 'Amoxicilline', dosage: '500 mg', form: 'Gelule', profile: 'Danil', quantity: 10, unit: 'gelules', expiryDate: '2026-03-20', threshold: 3, location: 'Salle de bain', notes: 'Traitement en cours' },
 ]
 
 const movements: Movement[] = [
@@ -154,14 +153,13 @@ type InventoryActionResponse = {
   movement: MovementApiRow
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ?? 'http://127.0.0.1:4000'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ?? ''
 
 async function fetchJson<T>(path: string, init?: RequestInit) {
   const response = await fetch(`${API_BASE_URL}${path}`, init)
 
   if (!response.ok) {
-    const errorPayload = await response.text()
-    throw new Error(`HTTP ${response.status}${errorPayload ? ` - ${errorPayload}` : ''}`)
+    throw new Error(`HTTP ${response.status}`)
   }
 
   if (response.status === 204) {
@@ -208,7 +206,6 @@ function mapInventory(row: InventoryApiRow): InventoryItem {
     name: row.medicineName,
     dosage: row.dosage,
     form: row.form,
-    profileId: row.profileId,
     profile: row.profileName ?? 'Foyer',
     quantity: row.quantity,
     unit: row.unit,
@@ -232,36 +229,6 @@ function mapMovement(row: MovementApiRow): Movement {
       hour: '2-digit',
       minute: '2-digit',
     }),
-  }
-}
-
-function toInventoryForm(item: InventoryItem): InventoryForm {
-  return {
-    name: item.name,
-    dosage: item.dosage,
-    form: item.form,
-    profileId: item.profileId ? String(item.profileId) : '',
-    quantity: String(item.quantity),
-    unit: item.unit,
-    expiryDate: item.expiryDate,
-    threshold: String(item.threshold),
-    location: item.location,
-    notes: item.notes,
-  }
-}
-
-function getEmptyInventoryForm(): InventoryForm {
-  return {
-    name: '',
-    dosage: '',
-    form: 'Comprime',
-    profileId: '',
-    quantity: '0',
-    unit: 'comprimes',
-    expiryDate: new Date().toISOString().slice(0, 10),
-    threshold: '1',
-    location: '',
-    notes: '',
   }
 }
 
@@ -357,16 +324,60 @@ function DashboardPage() {
       <div className="stats-grid">
         {stats.map((stat) => (
           <article key={stat.label} className="card stat-card">
-            <span className="eyebrow">Indicateur</span>
+            <span className="eyebrow">Vue globale</span>
             <strong>{stat.value}</strong>
             <p>{stat.label}</p>
           </article>
         ))}
       </div>
 
-      <article className="card alerts-board">
+      <article className="card chart-card">
         <div className="section-heading">
           <div>
+            <p className="eyebrow">Dashboard</p>
+            <h3>Niveaux de stock</h3>
+            <p className="muted">Vue de pilotage pour le gestionnaire principal et les aidants familiaux.</p>
+          </div>
+        </div>
+        <div className="chart-wrap">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={inventory}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip />
+              <Bar dataKey="quantity" fill="var(--accent)" radius={[8, 8, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </article>
+
+      <article className="card">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Alertes</p>
+            <h3>Alertes actives</h3>
+          </div>
+        </div>
+        <div className="stack-list">
+          {alerts.map((alert) => (
+            <div key={alert.id} className={`alert-row alert-${alert.severity}`}>
+              <strong>{alert.title}</strong>
+              <span>{alert.description}</span>
+            </div>
+          ))}
+        </div>
+      </article>
+
+      <article className="card">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Suivi</p>
+            <h3>Derniers mouvements</h3>
+          </div>
+        </div>
+        <div className="stack-list">
+          {movements.slice(0, 5).map((movement) => (
             <div key={movement.id} className="movement-row">
               <div>
                 <strong>{movement.medicine}</strong>
@@ -380,18 +391,120 @@ function DashboardPage() {
           ))}
         </div>
       </article>
+
+      <article className="card">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Famille</p>
+            <h3>Profils</h3>
+          </div>
+        </div>
+        <div className="stack-list">
+          {profiles.map((profile) => (
+            <div key={profile.id} className="profile-row">
+              <div>
+                <strong>{profile.name}</strong>
+                <p className="muted">{profile.role}</p>
+              </div>
+              <span className="pill">{profile.medicines} med.</span>
+            </div>
+          ))}
+        </div>
+      </article>
     </section>
   )
 }
 
 function InventoryPage() {
-  const [items, setItems] = useState<InventoryItem[]>([])
-  const [profileOptions, setProfileOptions] = useState<Array<{ id: number, name: string }>>([])
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
+  const [inventoryRows, setInventoryRows] = useState<InventoryItem[]>([])
+  const [selectedId, setSelectedId] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [actionPending, setActionPending] = useState(false)
+
+  async function loadInventory() {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const params = new URLSearchParams()
+
+      if (search.trim()) {
+        params.set('search', search.trim())
+      }
+
+      if (status !== 'all') {
+        params.set('status', status)
+      }
+
+      const query = params.toString()
+      const rows = await fetchJson<InventoryApiRow[]>(`/api/inventory${query ? `?${query}` : ''}`)
+      const mapped = rows.map(mapInventory)
+
+      setInventoryRows(mapped)
+      setSelectedId((current) => {
+        const hasCurrent = mapped.some((item) => item.id === current)
+        return hasCurrent ? current : (mapped[0]?.id ?? 0)
+      })
+    } catch {
+      setError('Impossible de charger l inventaire. Verifie que le backend tourne sur le port 4000.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadInventory()
+  }, [search, status])
+
+  const selectedItem = inventoryRows.find((item) => item.id === selectedId) ?? inventoryRows[0]
+
+  async function handleQuickAction(type: 'prise' | 'ajout') {
     if (!selectedItem) {
       return
     }
+
+    const quantityInput = window.prompt(
+      type === 'prise' ? 'Quantite prise ?' : 'Quantite ajoutee ?',
+      '1',
+    )
+
+    if (quantityInput === null) {
+      return
+    }
+
+    const quantity = Number.parseInt(quantityInput, 10)
+
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      setError('Saisis une quantite entiere positive.')
+      return
+    }
+
+    setActionPending(true)
+    setError(null)
+
+    try {
+      await fetchJson<InventoryActionResponse>(`/api/inventory/${selectedItem.id}/actions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type,
+          quantity,
+          note: type === 'prise' ? 'Prise enregistree depuis Inventaire' : 'Ajout enregistre depuis Inventaire',
+        }),
+      })
+
+      await loadInventory()
+    } catch {
+      setError(type === 'prise'
+        ? 'Echec de la prise (stock insuffisant ou item introuvable).'
+        : 'Echec de l ajout de stock.')
+    } finally {
+      setActionPending(false)
+    }
+  }
 
   return (
     <section className="page-grid inventory-layout">
@@ -401,12 +514,8 @@ function InventoryPage() {
             <p className="eyebrow">Inventaire</p>
             <h3>Gestion du stock</h3>
           </div>
-          <button className="primary-button" type="button" onClick={startCreate}>
-            Ajouter un medicament
-          </button>
+          <button className="primary-button" type="button">Ajouter un medicament</button>
         </div>
-
-        {error ? <p className="error-text">{error}</p> : null}
 
         <div className="toolbar-row">
           <input
@@ -416,12 +525,12 @@ function InventoryPage() {
             placeholder="Rechercher un medicament"
             aria-label="Rechercher un medicament"
           />
-          <select
-            className="select-input"
-            value={status}
-            onChange={(event) => setStatus(event.target.value)}
-            aria-label="Filtrer l inventaire par statut"
-          >
+            <select
+              className="select-input"
+              value={status}
+              onChange={(event) => setStatus(event.target.value)}
+              aria-label="Filtrer l inventaire par statut"
+            >
             <option value="all">Tous les statuts</option>
             <option value="ok">OK</option>
             <option value="critical">Stock critique</option>
@@ -429,6 +538,9 @@ function InventoryPage() {
             <option value="out">Rupture</option>
           </select>
         </div>
+
+        {loading ? <p>Chargement de l inventaire...</p> : null}
+        {error ? <p className="error-text">{error}</p> : null}
 
         <div className="inventory-grid">
           {inventoryRows.map((item) => {
@@ -438,94 +550,72 @@ function InventoryPage() {
                 key={item.id}
                 type="button"
                 className={selectedItem?.id === item.id ? 'inventory-card inventory-card-active' : 'inventory-card'}
-                onClick={() => startEdit(item)}
+                onClick={() => setSelectedId(item.id)}
               >
                 <div className="inventory-card-head">
                   <div>
                     <strong>{item.name}</strong>
-                    <p className="muted">{item.dosage} Â· {item.profile}</p>
+                    <p className="muted">{item.dosage} ┬À {item.profile}</p>
                   </div>
                   <span className="pill">{statusLabel}</span>
                 </div>
                 <progress className="progress-meter" value={item.quantity} max={Math.max(item.threshold * 4, 1)} />
-                <p className="muted">{item.quantity} {item.unit} Â· Exp. {item.expiryDate}</p>
+                <p className="muted">{item.quantity} {item.unit} ┬À Exp. {item.expiryDate}</p>
               </button>
             )
           })}
         </div>
       </article>
 
-      <article className="card detail-card">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">{mode === 'create' ? 'Nouveau medicament' : 'Edition medicament'}</p>
-            <h3>{mode === 'create' ? 'Ajouter un element' : selectedItem?.name ?? 'Modifier element'}</h3>
-          </div>
-          {mode === 'edit' && selectedItem ? <span className="pill">{selectedItem.profile}</span> : null}
-        </div>
-
-        <form className="inventory-form" onSubmit={handleSubmit}>
-          <div className="inventory-form-grid">
-            <label className="field-stack">
-              <span>Nom du medicament</span>
-              <input className="search-input" value={form.name} onChange={(event) => setField('name', event.target.value)} disabled={saving} />
-            </label>
-
-            <label className="field-stack">
-              <span>Dosage</span>
-              <input className="search-input" value={form.dosage} onChange={(event) => setField('dosage', event.target.value)} disabled={saving} />
-            </label>
-
-            <label className="field-stack">
-              <span>Forme</span>
-              <input className="search-input" value={form.form} onChange={(event) => setField('form', event.target.value)} disabled={saving} />
-            </label>
-
-            <label className="field-stack">
-              <span>Profil</span>
-              <select className="select-input" value={form.profileId} onChange={(event) => setField('profileId', event.target.value)} disabled={saving}>
-                <option value="">Aucun profil</option>
-                {profileOptions.map((option) => (
-                  <option key={option.id} value={option.id}>{option.name}</option>
-                ))}
-              </select>
-            </label>
-
-            <label className="field-stack">
-              <span>Quantite</span>
-              <input className="search-input" type="number" min="0" value={form.quantity} onChange={(event) => setField('quantity', event.target.value)} disabled={saving} />
-            </label>
-
-            <label className="field-stack">
-              <span>Unite</span>
-              <input className="search-input" value={form.unit} onChange={(event) => setField('unit', event.target.value)} disabled={saving} />
-            </label>
-
-            <label className="field-stack">
-              <span>Date de peremption</span>
-              <input className="search-input" type="date" value={form.expiryDate} onChange={(event) => setField('expiryDate', event.target.value)} disabled={saving} />
-            </label>
-
-            <label className="field-stack">
-              <span>Seuil critique</span>
-              <input className="search-input" type="number" min="0" value={form.threshold} onChange={(event) => setField('threshold', event.target.value)} disabled={saving} />
-            </label>
+      {selectedItem ? (
+        <article className="card detail-card">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Fiche detaillee</p>
+              <h3>{selectedItem.name}</h3>
+            </div>
+            <span className="pill">{selectedItem.profile}</span>
           </div>
 
-          <label className="field-stack">
-            <span>Emplacement</span>
-            <input className="search-input" value={form.location} onChange={(event) => setField('location', event.target.value)} disabled={saving} />
-          </label>
+          <dl className="detail-grid">
+            <div>
+              <dt>Dosage</dt>
+              <dd>{selectedItem.dosage}</dd>
+            </div>
+            <div>
+              <dt>Forme</dt>
+              <dd>{selectedItem.form}</dd>
+            </div>
+            <div>
+              <dt>Peremption</dt>
+              <dd>{selectedItem.expiryDate}</dd>
+            </div>
+            <div>
+              <dt>Emplacement</dt>
+              <dd>{selectedItem.location}</dd>
+            </div>
+            <div>
+              <dt>Stock</dt>
+              <dd>{selectedItem.quantity} {selectedItem.unit}</dd>
+            </div>
+            <div>
+              <dt>Seuil critique</dt>
+              <dd>{selectedItem.threshold}</dd>
+            </div>
+          </dl>
 
-          <label className="field-stack">
-            <span>Notes</span>
-            <textarea className="profile-textarea" rows={3} value={form.notes} onChange={(event) => setField('notes', event.target.value)} disabled={saving} />
-          </label>
+          <p className="detail-notes">{selectedItem.notes}</p>
 
           <div className="button-row">
+            <button className="primary-button" type="button" onClick={() => void handleQuickAction('prise')} disabled={actionPending}>
+              Enregistrer une prise
+            </button>
+            <button className="secondary-button" type="button" onClick={() => void handleQuickAction('ajout')} disabled={actionPending}>
+              Ajouter du stock
+            </button>
           </div>
-        </form>
-      </article>
+        </article>
+      ) : null}
     </section>
   )
 }
@@ -671,6 +761,8 @@ function ProfilesPage() {
       }
 
       resetForm()
+    } catch {
+      setError('Echec de sauvegarde du profil.')
     } finally {
       setSaving(false)
     }
@@ -914,7 +1006,7 @@ function HistoryPage() {
             <div key={movement.id} className="movement-row movement-row-large">
               <div>
                 <strong>{movement.medicine}</strong>
-                <p className="muted">{movement.profile} Â· {movement.type}</p>
+                <p className="muted">{movement.profile} ┬À {movement.type}</p>
               </div>
               <div className="align-right">
                 <strong>{movement.quantityDelta > 0 ? `+${movement.quantityDelta}` : movement.quantityDelta}</strong>
@@ -1024,4 +1116,3 @@ function AssistantPage() {
 export default function App() {
   return <Layout />
 }
-
