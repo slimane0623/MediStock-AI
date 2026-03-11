@@ -48,6 +48,18 @@ export type MovementRow = {
   occurredAt: string
 }
 
+export type InventoryActionInput = {
+  stockItemId: number
+  type: 'prise' | 'ajout'
+  quantity: number
+  profileId?: number | null
+  note?: string
+}
+
+export type InventoryActionResult =
+  | { ok: true, item: InventoryRow, movement: MovementRow }
+  | { ok: false, code: 'NOT_FOUND' | 'INSUFFICIENT_STOCK' }
+
 export type AlertRow = {
   id: number
   severity: 'critical' | 'warning'
@@ -212,6 +224,107 @@ export function listInventory(search = '', status?: InventoryStatus) {
 
     return getInventoryStatus(item) === status
   })
+}
+
+function getInventoryItemById(stockItemId: number) {
+  return db.prepare(`
+    SELECT
+      stock_items.id,
+      stock_items.medicine_id AS medicineId,
+      medicines.name AS medicineName,
+      medicines.dosage AS dosage,
+      medicines.form AS form,
+      stock_items.profile_id AS profileId,
+      profiles.name AS profileName,
+      stock_items.quantity,
+      stock_items.unit,
+      stock_items.expiry_date AS expiryDate,
+      stock_items.critical_threshold AS criticalThreshold,
+      stock_items.location,
+      stock_items.notes
+    FROM stock_items
+    JOIN medicines ON medicines.id = stock_items.medicine_id
+    LEFT JOIN profiles ON profiles.id = stock_items.profile_id
+    WHERE stock_items.id = ?
+  `).get(stockItemId) as InventoryRow | undefined
+}
+
+function getMovementById(movementId: number) {
+  return db.prepare(`
+    SELECT
+      movements.id,
+      movements.stock_item_id AS stockItemId,
+      movements.profile_id AS profileId,
+      profiles.name AS profileName,
+      medicines.name AS medicineName,
+      movements.type,
+      movements.quantity_delta AS quantityDelta,
+      movements.note,
+      movements.occurred_at AS occurredAt
+    FROM movements
+    JOIN stock_items ON stock_items.id = movements.stock_item_id
+    JOIN medicines ON medicines.id = stock_items.medicine_id
+    LEFT JOIN profiles ON profiles.id = movements.profile_id
+    WHERE movements.id = ?
+  `).get(movementId) as MovementRow | undefined
+}
+
+export function applyInventoryAction(input: InventoryActionInput): InventoryActionResult {
+  const stockItem = db.prepare(`
+    SELECT
+      id,
+      quantity,
+      profile_id AS profileId
+    FROM stock_items
+    WHERE id = ?
+  `).get(input.stockItemId) as { id: number, quantity: number, profileId: number | null } | undefined
+
+  if (!stockItem) {
+    return { ok: false, code: 'NOT_FOUND' }
+  }
+
+  const quantityDelta = input.type === 'prise' ? -input.quantity : input.quantity
+  const nextQuantity = stockItem.quantity + quantityDelta
+
+  if (nextQuantity < 0) {
+    return { ok: false, code: 'INSUFFICIENT_STOCK' }
+  }
+
+  const resolvedProfileId = input.profileId === undefined ? stockItem.profileId : input.profileId
+  const movementNote = input.note?.trim() || (input.type === 'prise' ? 'Prise enregistree depuis UI' : 'Ajout de stock depuis UI')
+  const occurredAt = new Date().toISOString()
+
+  db.exec('BEGIN')
+
+  try {
+    db.prepare('UPDATE stock_items SET quantity = ? WHERE id = ?').run(nextQuantity, input.stockItemId)
+
+    const movementResult = db.prepare(`
+      INSERT INTO movements (stock_item_id, profile_id, type, quantity_delta, note, occurred_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      input.stockItemId,
+      resolvedProfileId,
+      input.type,
+      quantityDelta,
+      movementNote,
+      occurredAt,
+    )
+
+    db.exec('COMMIT')
+
+    const item = getInventoryItemById(input.stockItemId)
+    const movement = getMovementById(Number(movementResult.lastInsertRowid))
+
+    if (!item || !movement) {
+      return { ok: false, code: 'NOT_FOUND' }
+    }
+
+    return { ok: true, item, movement }
+  } catch {
+    db.exec('ROLLBACK')
+    throw new Error('Failed to apply inventory action')
+  }
 }
 
 export function listMovements() {
