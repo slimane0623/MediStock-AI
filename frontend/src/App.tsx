@@ -236,14 +236,9 @@ function Layout() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="sidebar-header">
-          <div className="logo-container">
-            <img src="/logo-medistock.svg" alt="PharmaStock" className="logo" />
-            <div>
-              <p className="eyebrow">PharmaStock</p>
-              <h1>Gestion des medicaments familiaux</h1>
-            </div>
-          </div>
+        <div>
+          <p className="eyebrow">PharmaStock</p>
+          <h1>Gestion des medicaments familiaux</h1>
           <p className="muted">Suivi simple et securise du stock, des profils et des alertes.</p>
         </div>
 
@@ -270,6 +265,7 @@ function Layout() {
       <main className="main-panel">
         <header className="topbar">
           <div>
+            <p className="eyebrow">Prototype de travail</p>
             <h2>Tableau de bord</h2>
             <p className="muted">5 mars 2026</p>
           </div>
@@ -317,75 +313,60 @@ function DashboardPage() {
       <div className="stats-grid">
         {stats.map((stat) => (
           <article key={stat.label} className="card stat-card">
-            <span className="eyebrow">Indicateur</span>
+            <span className="eyebrow">Vue globale</span>
             <strong>{stat.value}</strong>
             <p>{stat.label}</p>
           </article>
         ))}
       </div>
 
-      <article className="card alerts-board">
+      <article className="card chart-card">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Alertes actives</p>
-            <h3>Suivi prioritaire</h3>
+            <p className="eyebrow">Dashboard</p>
+            <h3>Niveaux de stock</h3>
+            <p className="muted">Vue de pilotage pour le gestionnaire principal et les aidants familiaux.</p>
+          </div>
+        </div>
+        <div className="chart-wrap">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={inventory}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip />
+              <Bar dataKey="quantity" fill="var(--accent)" radius={[8, 8, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </article>
+
+      <article className="card">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Alertes</p>
+            <h3>Alertes actives</h3>
           </div>
         </div>
         <div className="stack-list">
           {alerts.map((alert) => (
             <div key={alert.id} className={`alert-row alert-${alert.severity}`}>
               <strong>{alert.title}</strong>
-              <span className="pill">{alert.description}</span>
+              <span>{alert.description}</span>
             </div>
           ))}
         </div>
       </article>
 
-      <div className="dashboard-lower">
-        <article className="card chart-card">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Niveaux de stock</p>
-              <h3>Quantites actuelles</h3>
-            </div>
-          </div>
-          <div className="chart-wrap">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={inventory}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="quantity" fill="var(--accent)" radius={[8, 8, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </article>
-
-        <article className="card quick-actions">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Actions rapides</p>
-              <h3>Raccourcis</h3>
-            </div>
-          </div>
-          <div className="stack-list">
-            <button className="primary-button" type="button">Ajouter un medicament</button>
-            <button className="secondary-button" type="button">J ai pris mon medicament</button>
-            <button className="secondary-button" type="button">Voir tout le stock</button>
-          </div>
-        </article>
-      </div>
-
       <article className="card">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Derniers mouvements</p>
-            <h3>Historique recent</h3>
+            <p className="eyebrow">Suivi</p>
+            <h3>Derniers mouvements</h3>
           </div>
         </div>
         <div className="stack-list">
-          {movements.slice(0, 3).map((movement) => (
+          {movements.slice(0, 5).map((movement) => (
             <div key={movement.id} className="movement-row">
               <div>
                 <strong>{movement.medicine}</strong>
@@ -395,6 +376,26 @@ function DashboardPage() {
                 <strong>{movement.quantityDelta > 0 ? `+${movement.quantityDelta}` : movement.quantityDelta}</strong>
                 <p className="muted">{movement.occurredAt}</p>
               </div>
+            </div>
+          ))}
+        </div>
+      </article>
+
+      <article className="card">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Famille</p>
+            <h3>Profils</h3>
+          </div>
+        </div>
+        <div className="stack-list">
+          {profiles.map((profile) => (
+            <div key={profile.id} className="profile-row">
+              <div>
+                <strong>{profile.name}</strong>
+                <p className="muted">{profile.role}</p>
+              </div>
+              <span className="pill">{profile.medicines} med.</span>
             </div>
           ))}
         </div>
