@@ -93,10 +93,8 @@ const alerts: Alert[] = [
 ]
 
 const navigation = [
-  { to: '/', label: 'Dashboard', shortLabel: 'Home' },
-  { to: '/inventaire', label: 'Inventaire', shortLabel: 'Stock' },
-  { to: '/profils', label: 'Beneficiaires', shortLabel: 'Benef.' },
-  { to: '/historique', label: 'Historique', shortLabel: 'Logs' },
+  { to: '/', label: 'Accueil', shortLabel: 'Accueil' },
+  { to: '/gestion', label: 'Gestion', shortLabel: 'Gestion' },
   { to: '/assistant', label: 'Assistant IA', shortLabel: 'IA' },
 ]
 
@@ -213,9 +211,10 @@ function Layout() {
 
         <Routes>
           <Route path="/" element={<DashboardPage />} />
-          <Route path="/inventaire" element={<InventoryPage />} />
-          <Route path="/profils" element={<ProfilesPage />} />
-          <Route path="/historique" element={<HistoryPage />} />
+          <Route path="/gestion" element={<GestionPage />} />
+          <Route path="/inventaire" element={<GestionPage />} />
+          <Route path="/profils" element={<GestionPage />} />
+          <Route path="/historique" element={<GestionPage />} />
           <Route path="/assistant" element={<AssistantPage />} />
         </Routes>
       </main>
@@ -458,6 +457,27 @@ function InventoryPage() {
         </article>
       ) : null}
     </section>
+  )
+}
+
+function GestionPage() {
+  return (
+    <>
+      <section className="page-grid">
+        <article className="card">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Gestion</p>
+              <h3>Inventaire, beneficiaires et historique</h3>
+              <p className="muted">Cette page regroupe toutes les operations de gestion du foyer.</p>
+            </div>
+          </div>
+        </article>
+      </section>
+      <InventoryPage />
+      <ProfilesPage />
+      <HistoryPage />
+    </>
   )
 }
 
