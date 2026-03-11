@@ -34,6 +34,7 @@ type InventoryItem = {
   name: string
   dosage: string
   form: string
+  profileId: number | null
   profile: string
   quantity: number
   unit: string
@@ -101,10 +102,10 @@ const profiles: Profile[] = [
 ]
 
 const inventory: InventoryItem[] = [
-  { id: 1, name: 'Doliprane', dosage: '1000 mg', form: 'Comprime', profile: 'Danil', quantity: 16, unit: 'comprimes', expiryDate: '2026-06-14', threshold: 4, location: 'Cuisine', notes: 'Boite entamee' },
-  { id: 2, name: 'Metformine', dosage: '500 mg', form: 'Comprime', profile: 'Slim', quantity: 8, unit: 'comprimes', expiryDate: '2026-03-29', threshold: 5, location: 'Salon', notes: 'Renouvellement proche' },
-  { id: 3, name: 'Levothyrox', dosage: '75 ug', form: 'Comprime', profile: 'Mamie Jeanne', quantity: 0, unit: 'comprimes', expiryDate: '2026-04-06', threshold: 2, location: 'Boite senior', notes: 'Rupture' },
-  { id: 4, name: 'Amoxicilline', dosage: '500 mg', form: 'Gelule', profile: 'Danil', quantity: 10, unit: 'gelules', expiryDate: '2026-03-20', threshold: 3, location: 'Salle de bain', notes: 'Traitement en cours' },
+  { id: 1, name: 'Doliprane', dosage: '1000 mg', form: 'Comprime', profileId: 1, profile: 'Danil', quantity: 16, unit: 'comprimes', expiryDate: '2026-06-14', threshold: 4, location: 'Cuisine', notes: 'Boite entamee' },
+  { id: 2, name: 'Metformine', dosage: '500 mg', form: 'Comprime', profileId: 2, profile: 'Slim', quantity: 8, unit: 'comprimes', expiryDate: '2026-03-29', threshold: 5, location: 'Salon', notes: 'Renouvellement proche' },
+  { id: 3, name: 'Levothyrox', dosage: '75 ug', form: 'Comprime', profileId: 3, profile: 'Mamie Jeanne', quantity: 0, unit: 'comprimes', expiryDate: '2026-04-06', threshold: 2, location: 'Boite senior', notes: 'Rupture' },
+  { id: 4, name: 'Amoxicilline', dosage: '500 mg', form: 'Gelule', profileId: 1, profile: 'Danil', quantity: 10, unit: 'gelules', expiryDate: '2026-03-20', threshold: 3, location: 'Salle de bain', notes: 'Traitement en cours' },
 ]
 
 const movements: Movement[] = [
@@ -153,13 +154,14 @@ type InventoryActionResponse = {
   movement: MovementApiRow
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ?? ''
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ?? 'http://127.0.0.1:4000'
 
 async function fetchJson<T>(path: string, init?: RequestInit) {
   const response = await fetch(`${API_BASE_URL}${path}`, init)
 
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`)
+    const errorPayload = await response.text()
+    throw new Error(`HTTP ${response.status}${errorPayload ? ` - ${errorPayload}` : ''}`)
   }
 
   if (response.status === 204) {
@@ -200,12 +202,20 @@ function getStatusLabel(status: string) {
   }
 }
 
+<<<<<<< HEAD
 function mapInventory(row: InventoryApiRow): InventoryItem {
+=======
+function mapInventoryApiRow(row: InventoryApiRow): InventoryItem {
+>>>>>>> origin/sprint-1-bdd-crud-roles
   return {
     id: row.id,
     name: row.medicineName,
     dosage: row.dosage,
     form: row.form,
+<<<<<<< HEAD
+=======
+    profileId: row.profileId,
+>>>>>>> origin/sprint-1-bdd-crud-roles
     profile: row.profileName ?? 'Foyer',
     quantity: row.quantity,
     unit: row.unit,
@@ -216,6 +226,7 @@ function mapInventory(row: InventoryApiRow): InventoryItem {
   }
 }
 
+<<<<<<< HEAD
 function mapMovement(row: MovementApiRow): Movement {
   return {
     id: row.id,
@@ -229,6 +240,35 @@ function mapMovement(row: MovementApiRow): Movement {
       hour: '2-digit',
       minute: '2-digit',
     }),
+=======
+function toInventoryForm(item: InventoryItem): InventoryForm {
+  return {
+    name: item.name,
+    dosage: item.dosage,
+    form: item.form,
+    profileId: item.profileId ? String(item.profileId) : '',
+    quantity: String(item.quantity),
+    unit: item.unit,
+    expiryDate: item.expiryDate,
+    threshold: String(item.threshold),
+    location: item.location,
+    notes: item.notes,
+  }
+}
+
+function getEmptyInventoryForm(): InventoryForm {
+  return {
+    name: '',
+    dosage: '',
+    form: 'Comprime',
+    profileId: '',
+    quantity: '0',
+    unit: 'comprimes',
+    expiryDate: new Date().toISOString().slice(0, 10),
+    threshold: '1',
+    location: '',
+    notes: '',
+>>>>>>> origin/sprint-1-bdd-crud-roles
   }
 }
 
@@ -247,9 +287,20 @@ function Layout() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
+<<<<<<< HEAD
         <div>
           <p className="eyebrow">PharmaStock</p>
           <h1>Gestion des medicaments familiaux</h1>
+=======
+        <div className="sidebar-header">
+          <div className="logo-container">
+            <img src="/logo-medistock.svg" alt="PharmaStock" className="logo" />
+            <div>
+              <p className="eyebrow">PharmaStock</p>
+              <h1>Gestion des medicaments familiaux</h1>
+            </div>
+          </div>
+>>>>>>> origin/sprint-1-bdd-crud-roles
           <p className="muted">Suivi simple et securise du stock, des profils et des alertes.</p>
         </div>
 
@@ -276,8 +327,12 @@ function Layout() {
       <main className="main-panel">
         <header className="topbar">
           <div>
+<<<<<<< HEAD
             <p className="eyebrow">Prototype de travail</p>
             <h2>{pageTitle}</h2>
+=======
+            <h2>Tableau de bord</h2>
+>>>>>>> origin/sprint-1-bdd-crud-roles
             <p className="muted">5 mars 2026</p>
           </div>
           <div className="topbar-actions">
@@ -324,16 +379,17 @@ function DashboardPage() {
       <div className="stats-grid">
         {stats.map((stat) => (
           <article key={stat.label} className="card stat-card">
-            <span className="eyebrow">Vue globale</span>
+            <span className="eyebrow">Indicateur</span>
             <strong>{stat.value}</strong>
             <p>{stat.label}</p>
           </article>
         ))}
       </div>
 
-      <article className="card chart-card">
+      <article className="card alerts-board">
         <div className="section-heading">
           <div>
+<<<<<<< HEAD
             <p className="eyebrow">Dashboard</p>
             <h3>Niveaux de stock</h3>
             <p className="muted">Vue de pilotage pour le gestionnaire principal et les aidants familiaux.</p>
@@ -357,27 +413,71 @@ function DashboardPage() {
           <div>
             <p className="eyebrow">Alertes</p>
             <h3>Alertes actives</h3>
+=======
+            <p className="eyebrow">Alertes actives</p>
+            <h3>Suivi prioritaire</h3>
+>>>>>>> origin/sprint-1-bdd-crud-roles
           </div>
         </div>
         <div className="stack-list">
           {alerts.map((alert) => (
             <div key={alert.id} className={`alert-row alert-${alert.severity}`}>
               <strong>{alert.title}</strong>
-              <span>{alert.description}</span>
+              <span className="pill">{alert.description}</span>
             </div>
           ))}
         </div>
       </article>
 
+      <div className="dashboard-lower">
+        <article className="card chart-card">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Niveaux de stock</p>
+              <h3>Quantites actuelles</h3>
+            </div>
+          </div>
+          <div className="chart-wrap">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={inventory}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="quantity" fill="var(--accent)" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </article>
+
+        <article className="card quick-actions">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Actions rapides</p>
+              <h3>Raccourcis</h3>
+            </div>
+          </div>
+          <div className="stack-list">
+            <button className="primary-button" type="button">Ajouter un medicament</button>
+            <button className="secondary-button" type="button">J ai pris mon medicament</button>
+            <button className="secondary-button" type="button">Voir tout le stock</button>
+          </div>
+        </article>
+      </div>
+
       <article className="card">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Suivi</p>
-            <h3>Derniers mouvements</h3>
+            <p className="eyebrow">Derniers mouvements</p>
+            <h3>Historique recent</h3>
           </div>
         </div>
         <div className="stack-list">
+<<<<<<< HEAD
           {movements.slice(0, 5).map((movement) => (
+=======
+          {movements.slice(0, 3).map((movement) => (
+>>>>>>> origin/sprint-1-bdd-crud-roles
             <div key={movement.id} className="movement-row">
               <div>
                 <strong>{movement.medicine}</strong>
@@ -391,33 +491,16 @@ function DashboardPage() {
           ))}
         </div>
       </article>
-
-      <article className="card">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Famille</p>
-            <h3>Profils</h3>
-          </div>
-        </div>
-        <div className="stack-list">
-          {profiles.map((profile) => (
-            <div key={profile.id} className="profile-row">
-              <div>
-                <strong>{profile.name}</strong>
-                <p className="muted">{profile.role}</p>
-              </div>
-              <span className="pill">{profile.medicines} med.</span>
-            </div>
-          ))}
-        </div>
-      </article>
     </section>
   )
 }
 
 function InventoryPage() {
+  const [items, setItems] = useState<InventoryItem[]>([])
+  const [profileOptions, setProfileOptions] = useState<Array<{ id: number, name: string }>>([])
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
+<<<<<<< HEAD
   const [inventoryRows, setInventoryRows] = useState<InventoryItem[]>([])
   const [selectedId, setSelectedId] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -462,10 +545,148 @@ function InventoryPage() {
   const selectedItem = inventoryRows.find((item) => item.id === selectedId) ?? inventoryRows[0]
 
   async function handleQuickAction(type: 'prise' | 'ajout') {
+=======
+  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [mode, setMode] = useState<'create' | 'edit'>('create')
+  const [form, setForm] = useState<InventoryForm>(getEmptyInventoryForm())
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function loadInventory(preferredId?: number | null) {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const [inventoryRows, profileRows] = await Promise.all([
+        fetchJson<InventoryApiRow[]>('/api/inventory'),
+        fetchJson<ProfileApiRow[]>('/api/profiles'),
+      ])
+
+      const mappedItems = inventoryRows.map(mapInventoryApiRow)
+
+      setItems(mappedItems)
+      setProfileOptions(profileRows.map((row) => ({ id: row.id, name: row.name })))
+
+      if (mappedItems.length === 0) {
+        setSelectedId(null)
+        setMode('create')
+        setForm(getEmptyInventoryForm())
+        return
+      }
+
+      const candidateId = preferredId ?? selectedId
+      const hasCandidate = candidateId !== null && mappedItems.some((item) => item.id === candidateId)
+      const nextId = hasCandidate ? candidateId : mappedItems[0].id
+
+      setSelectedId(nextId)
+
+      if (mode === 'edit') {
+        const selected = mappedItems.find((item) => item.id === nextId)
+
+        if (selected) {
+          setForm(toInventoryForm(selected))
+        }
+      }
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : 'Erreur inconnue'
+      setError(`Impossible de charger l inventaire. ${message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadInventory()
+  }, [])
+
+  const filteredItems = items.filter((item) => {
+    const haystack = `${item.name} ${item.dosage} ${item.profile}`.toLowerCase()
+    const matchesSearch = haystack.includes(search.toLowerCase())
+    const matchesStatus = status === 'all' ? true : getStatus(item) === status
+    return matchesSearch && matchesStatus
+  })
+
+  const selectedItem = items.find((item) => item.id === selectedId) ?? null
+
+  function startCreate() {
+    setMode('create')
+    setSelectedId(null)
+    setForm(getEmptyInventoryForm())
+    setError(null)
+  }
+
+  function startEdit(item: InventoryItem) {
+    setMode('edit')
+    setSelectedId(item.id)
+    setForm(toInventoryForm(item))
+    setError(null)
+  }
+
+  function setField(field: keyof InventoryForm, value: string) {
+    setForm((current) => ({ ...current, [field]: value }))
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const quantity = Number(form.quantity)
+    const threshold = Number(form.threshold)
+
+    if (!Number.isInteger(quantity) || quantity < 0 || !Number.isInteger(threshold) || threshold < 0) {
+      setError('Quantite et seuil critique doivent etre des nombres entiers >= 0.')
+      return
+    }
+
+    const payload = {
+      medicineName: form.name.trim(),
+      dosage: form.dosage.trim(),
+      form: form.form.trim(),
+      profileId: form.profileId ? Number(form.profileId) : null,
+      quantity,
+      unit: form.unit.trim(),
+      expiryDate: form.expiryDate,
+      criticalThreshold: threshold,
+      location: form.location.trim(),
+      notes: form.notes.trim(),
+    }
+
+    if (!payload.medicineName || !payload.dosage || !payload.form || !payload.unit || !payload.expiryDate || !payload.location) {
+      setError('Tous les champs obligatoires doivent etre remplis.')
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+
+    try {
+      const isCreate = mode === 'create' || selectedItem === null
+      const path = isCreate ? '/api/inventory' : `/api/inventory/${selectedItem.id}`
+      const method = isCreate ? 'POST' : 'PUT'
+
+      const saved = await fetchJson<InventoryApiRow>(path, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      setMode('edit')
+      await loadInventory(saved.id)
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : 'Erreur inconnue'
+      setError(`Echec de sauvegarde inventaire. ${message}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete() {
+>>>>>>> origin/sprint-1-bdd-crud-roles
     if (!selectedItem) {
       return
     }
 
+<<<<<<< HEAD
     const quantityInput = window.prompt(
       type === 'prise' ? 'Quantite prise ?' : 'Quantite ajoutee ?',
       '1',
@@ -505,6 +726,32 @@ function InventoryPage() {
       setActionPending(false)
     }
   }
+=======
+    if (!globalThis.confirm(`Supprimer ${selectedItem.name} de l inventaire ?`)) {
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+
+    try {
+      await fetchJson<void>(`/api/inventory/${selectedItem.id}`, { method: 'DELETE' })
+      startCreate()
+      await loadInventory()
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : 'Erreur inconnue'
+      setError(`Echec de suppression inventaire. ${message}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  let submitLabel = mode === 'create' ? 'Ajouter medicament' : 'Enregistrer modification'
+
+  if (saving) {
+    submitLabel = 'Sauvegarde...'
+  }
+>>>>>>> origin/sprint-1-bdd-crud-roles
 
   return (
     <section className="page-grid inventory-layout">
@@ -514,8 +761,12 @@ function InventoryPage() {
             <p className="eyebrow">Inventaire</p>
             <h3>Gestion du stock</h3>
           </div>
-          <button className="primary-button" type="button">Ajouter un medicament</button>
+          <button className="primary-button" type="button" onClick={startCreate}>
+            Ajouter un medicament
+          </button>
         </div>
+
+        {error ? <p className="error-text">{error}</p> : null}
 
         <div className="toolbar-row">
           <input
@@ -525,12 +776,12 @@ function InventoryPage() {
             placeholder="Rechercher un medicament"
             aria-label="Rechercher un medicament"
           />
-            <select
-              className="select-input"
-              value={status}
-              onChange={(event) => setStatus(event.target.value)}
-              aria-label="Filtrer l inventaire par statut"
-            >
+          <select
+            className="select-input"
+            value={status}
+            onChange={(event) => setStatus(event.target.value)}
+            aria-label="Filtrer l inventaire par statut"
+          >
             <option value="all">Tous les statuts</option>
             <option value="ok">OK</option>
             <option value="critical">Stock critique</option>
@@ -539,8 +790,12 @@ function InventoryPage() {
           </select>
         </div>
 
+<<<<<<< HEAD
         {loading ? <p>Chargement de l inventaire...</p> : null}
         {error ? <p className="error-text">{error}</p> : null}
+=======
+        {loading ? <p className="muted">Chargement inventaire...</p> : null}
+>>>>>>> origin/sprint-1-bdd-crud-roles
 
         <div className="inventory-grid">
           {inventoryRows.map((item) => {
@@ -550,7 +805,7 @@ function InventoryPage() {
                 key={item.id}
                 type="button"
                 className={selectedItem?.id === item.id ? 'inventory-card inventory-card-active' : 'inventory-card'}
-                onClick={() => setSelectedId(item.id)}
+                onClick={() => startEdit(item)}
               >
                 <div className="inventory-card-head">
                   <div>
@@ -567,55 +822,92 @@ function InventoryPage() {
         </div>
       </article>
 
-      {selectedItem ? (
-        <article className="card detail-card">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Fiche detaillee</p>
-              <h3>{selectedItem.name}</h3>
-            </div>
-            <span className="pill">{selectedItem.profile}</span>
+      <article className="card detail-card">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">{mode === 'create' ? 'Nouveau medicament' : 'Edition medicament'}</p>
+            <h3>{mode === 'create' ? 'Ajouter un element' : selectedItem?.name ?? 'Modifier element'}</h3>
+          </div>
+          {mode === 'edit' && selectedItem ? <span className="pill">{selectedItem.profile}</span> : null}
+        </div>
+
+        <form className="inventory-form" onSubmit={handleSubmit}>
+          <div className="inventory-form-grid">
+            <label className="field-stack">
+              <span>Nom du medicament</span>
+              <input className="search-input" value={form.name} onChange={(event) => setField('name', event.target.value)} disabled={saving} />
+            </label>
+
+            <label className="field-stack">
+              <span>Dosage</span>
+              <input className="search-input" value={form.dosage} onChange={(event) => setField('dosage', event.target.value)} disabled={saving} />
+            </label>
+
+            <label className="field-stack">
+              <span>Forme</span>
+              <input className="search-input" value={form.form} onChange={(event) => setField('form', event.target.value)} disabled={saving} />
+            </label>
+
+            <label className="field-stack">
+              <span>Profil</span>
+              <select className="select-input" value={form.profileId} onChange={(event) => setField('profileId', event.target.value)} disabled={saving}>
+                <option value="">Aucun profil</option>
+                {profileOptions.map((option) => (
+                  <option key={option.id} value={option.id}>{option.name}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="field-stack">
+              <span>Quantite</span>
+              <input className="search-input" type="number" min="0" value={form.quantity} onChange={(event) => setField('quantity', event.target.value)} disabled={saving} />
+            </label>
+
+            <label className="field-stack">
+              <span>Unite</span>
+              <input className="search-input" value={form.unit} onChange={(event) => setField('unit', event.target.value)} disabled={saving} />
+            </label>
+
+            <label className="field-stack">
+              <span>Date de peremption</span>
+              <input className="search-input" type="date" value={form.expiryDate} onChange={(event) => setField('expiryDate', event.target.value)} disabled={saving} />
+            </label>
+
+            <label className="field-stack">
+              <span>Seuil critique</span>
+              <input className="search-input" type="number" min="0" value={form.threshold} onChange={(event) => setField('threshold', event.target.value)} disabled={saving} />
+            </label>
           </div>
 
-          <dl className="detail-grid">
-            <div>
-              <dt>Dosage</dt>
-              <dd>{selectedItem.dosage}</dd>
-            </div>
-            <div>
-              <dt>Forme</dt>
-              <dd>{selectedItem.form}</dd>
-            </div>
-            <div>
-              <dt>Peremption</dt>
-              <dd>{selectedItem.expiryDate}</dd>
-            </div>
-            <div>
-              <dt>Emplacement</dt>
-              <dd>{selectedItem.location}</dd>
-            </div>
-            <div>
-              <dt>Stock</dt>
-              <dd>{selectedItem.quantity} {selectedItem.unit}</dd>
-            </div>
-            <div>
-              <dt>Seuil critique</dt>
-              <dd>{selectedItem.threshold}</dd>
-            </div>
-          </dl>
+          <label className="field-stack">
+            <span>Emplacement</span>
+            <input className="search-input" value={form.location} onChange={(event) => setField('location', event.target.value)} disabled={saving} />
+          </label>
 
-          <p className="detail-notes">{selectedItem.notes}</p>
+          <label className="field-stack">
+            <span>Notes</span>
+            <textarea className="profile-textarea" rows={3} value={form.notes} onChange={(event) => setField('notes', event.target.value)} disabled={saving} />
+          </label>
 
           <div className="button-row">
+<<<<<<< HEAD
             <button className="primary-button" type="button" onClick={() => void handleQuickAction('prise')} disabled={actionPending}>
               Enregistrer une prise
             </button>
             <button className="secondary-button" type="button" onClick={() => void handleQuickAction('ajout')} disabled={actionPending}>
               Ajouter du stock
             </button>
+=======
+            <button className="primary-button" type="submit" disabled={saving}>{submitLabel}</button>
+            {mode === 'edit' && selectedItem ? (
+              <button className="danger-button" type="button" onClick={() => void handleDelete()} disabled={saving}>
+                Supprimer
+              </button>
+            ) : null}
+>>>>>>> origin/sprint-1-bdd-crud-roles
           </div>
-        </article>
-      ) : null}
+        </form>
+      </article>
     </section>
   )
 }
@@ -761,8 +1053,14 @@ function ProfilesPage() {
       }
 
       resetForm()
+<<<<<<< HEAD
     } catch {
       setError('Echec de sauvegarde du profil.')
+=======
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : 'Erreur inconnue'
+      setError(`Echec de sauvegarde du profil. ${message}`)
+>>>>>>> origin/sprint-1-bdd-crud-roles
     } finally {
       setSaving(false)
     }
