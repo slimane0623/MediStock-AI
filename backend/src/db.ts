@@ -20,6 +20,14 @@ export type ProfileRow = {
   notes: string
 }
 
+export type ProfileMutationInput = {
+  name: string
+  role: string
+  birthDate: string
+  allergies: string
+  notes: string
+}
+
 export type InventoryRow = {
   id: number
   medicineId: number
@@ -173,6 +181,68 @@ export function listProfiles() {
     FROM profiles
     ORDER BY id ASC
   `).all() as ProfileRow[]
+}
+
+export function getProfileById(id: number) {
+  return db.prepare(`
+    SELECT
+      id,
+      name,
+      role,
+      birth_date AS birthDate,
+      allergies,
+      notes
+    FROM profiles
+    WHERE id = ?
+  `).get(id) as ProfileRow | undefined
+}
+
+export function createProfile(input: ProfileMutationInput) {
+  const result = db.prepare(`
+    INSERT INTO profiles (name, role, birth_date, allergies, notes)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(
+    input.name,
+    input.role,
+    input.birthDate,
+    input.allergies,
+    input.notes,
+  )
+
+  return getProfileById(Number(result.lastInsertRowid))
+}
+
+export function updateProfile(id: number, input: ProfileMutationInput) {
+  const result = db.prepare(`
+    UPDATE profiles
+    SET
+      name = ?,
+      role = ?,
+      birth_date = ?,
+      allergies = ?,
+      notes = ?
+    WHERE id = ?
+  `).run(
+    input.name,
+    input.role,
+    input.birthDate,
+    input.allergies,
+    input.notes,
+    id,
+  )
+
+  if (result.changes === 0) {
+    return null
+  }
+
+  return getProfileById(id) ?? null
+}
+
+export function deleteProfile(id: number) {
+  db.prepare('UPDATE movements SET profile_id = NULL WHERE profile_id = ?').run(id)
+  db.prepare('UPDATE stock_items SET profile_id = NULL WHERE profile_id = ?').run(id)
+  const result = db.prepare('DELETE FROM profiles WHERE id = ?').run(id)
+  return result.changes > 0
 }
 
 export function listInventory(search = '', status?: InventoryStatus) {

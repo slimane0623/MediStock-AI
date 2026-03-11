@@ -177,11 +177,11 @@ Livrable minimum Sprint 3:
 Principe:
 - Chaque personne prend une feature complete: Frontend + Backend lies
 - Une PR n est complete que si UI + API + test manuel sont livres ensemble
-- Base de travail sprint: sprint-X-..., puis branches feature dediees
+- Base de travail sprint: `sprint-X-...`, puis branches feature dediees
 
 Template de branche:
-- feat/sX-danil
-- feat/sX-slimane
+- `feat/sX-nom-feature-danil`
+- `feat/sX-nom-feature-slim`
 
 ---
 
@@ -190,11 +190,11 @@ Template de branche:
 ### Sprint 1 - Base de donnees + CRUD + roles
 - Danil (feature: profils CRUD)
   - Front: ecrans profils (liste, creation, edition, suppression)
-  - Back: endpoints GET/POST/PUT/DELETE /api/profiles connectes a SQLite
+  - Back: endpoints `GET/POST/PUT/DELETE /api/profiles` connectes a SQLite
   - Definition of done: operations CRUD profils fonctionnelles depuis UI
 - Slim (feature: inventaire CRUD)
   - Front: ecran inventaire (liste + ajout + edition + suppression)
-  - Back: endpoints GET/POST/PUT/DELETE /api/inventory + validation Zod
+  - Back: endpoints `GET/POST/PUT/DELETE /api/inventory` + validation Zod
   - Definition of done: ajout/modification inventaire visible en UI et persiste en DB
 
 ### Sprint 2 - Inventaire complet + profils
@@ -248,7 +248,6 @@ Template de branche:
   - Definition of done: doc runnable + endpoints stables en test charge local
 
 ---
-
 ## 7) Risques et mitigations (cahier des charges)
 
 - R1 Performance LLM locale insuffisante (impact eleve)
