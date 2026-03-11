@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useTransition, type FormEvent } from 'react'
+﻿import { useEffect, useState, type FormEvent } from 'react'
 import {
   Bar,
   BarChart,
@@ -93,6 +93,38 @@ type ChatMessage = {
   content: string
 }
 
+type ChatApiRequest = {
+  message: string
+  history?: Array<{ role: 'user' | 'assistant', content: string }>
+  requestId?: string
+}
+
+type ChatApiSuccess = {
+  ok: true
+  requestId: string | null
+  reply: string
+  disclaimer: string
+  meta: {
+    model: string
+    latencyMs: number
+    timeoutMs: number
+  }
+}
+
+type ChatApiFailure = {
+  ok: false
+  requestId: string | null
+  error: {
+    code: string
+    message: string
+  }
+  meta?: {
+    model: string
+    latencyMs: number
+    timeoutMs: number
+  }
+}
+
 const profiles: Profile[] = [
   { id: 1, name: 'Danil', role: 'Gestionnaire principal', birthDate: '1999-05-10', allergies: 'Aucune', notes: 'Profil principal', medicines: 12 },
   { id: 2, name: 'Slim', role: 'Patient chronique', birthDate: '2000-02-14', allergies: 'Penicilline', notes: 'Suivi quotidien', medicines: 5 },
@@ -153,7 +185,7 @@ type InventoryActionResponse = {
   movement: MovementApiRow
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ?? ''
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ?? 'http://127.0.0.1:4000'
 
 async function fetchJson<T>(path: string, init?: RequestInit) {
   const response = await fetch(`${API_BASE_URL}${path}`, init)
@@ -1034,7 +1066,9 @@ function AssistantPage() {
     },
   ])
   const [input, setInput] = useState('')
-  const [isPending, startTransition] = useTransition()
+  const [isTyping, setIsTyping] = useState(false)
+  const [chatError, setChatError] = useState<string | null>(null)
+  const [lastFailedMessage, setLastFailedMessage] = useState<string | null>(null)
 
   const suggestions = [
     'Verifier interactions',
@@ -1043,31 +1077,79 @@ function AssistantPage() {
     'Prochain renouvellement',
   ]
 
-  function sendMessage(message: string) {
+  async function askChatApi(message: string, history: ChatApiRequest['history']) {
+    const requestId = `${Date.now()}`
+
+    const response = await fetch(`${API_BASE_URL}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, history, requestId } satisfies ChatApiRequest),
+    })
+
+    const payload = await response.json() as ChatApiSuccess | ChatApiFailure
+
+    if (!response.ok || payload.ok === false) {
+      const messageText = payload.ok === false
+        ? payload.error.message
+        : `HTTP ${response.status}`
+      throw new Error(messageText)
+    }
+
+    return payload
+  }
+
+  async function sendMessage(message: string) {
     const trimmedMessage = message.trim()
 
     if (!trimmedMessage) {
       return
     }
 
+    const historyContext = messages.slice(-8).map((entry) => ({ role: entry.role, content: entry.content }))
+
     setMessages((current) => [
       ...current,
       { id: Date.now(), role: 'user', content: trimmedMessage },
     ])
     setInput('')
+    setChatError(null)
+    setLastFailedMessage(null)
+    setIsTyping(true)
 
-    window.setTimeout(() => {
-      startTransition(() => {
-        setMessages((current) => [
-          ...current,
-          {
-            id: Date.now() + 1,
-            role: 'assistant',
-            content: 'Reponse simulee pour le socle frontend. La vraie integration passera ensuite par le backend Node et l assistant local.',
-          },
-        ])
-      })
-    }, 700)
+    try {
+      const reply = await askChatApi(trimmedMessage, historyContext)
+
+      setMessages((current) => [
+        ...current,
+        {
+          id: Date.now() + 1,
+          role: 'assistant',
+          content: `${reply.reply}\n\n${reply.disclaimer}`,
+        },
+      ])
+    } catch (error) {
+      const messageText = error instanceof Error ? error.message : 'Erreur inconnue pendant la reponse du chat.'
+      setChatError(messageText)
+      setLastFailedMessage(trimmedMessage)
+      setMessages((current) => [
+        ...current,
+        {
+          id: Date.now() + 1,
+          role: 'assistant',
+          content: 'Je rencontre une erreur temporaire. Tu peux relancer avec Reessayer.',
+        },
+      ])
+    } finally {
+      setIsTyping(false)
+    }
+  }
+
+  function retryLastMessage() {
+    if (!lastFailedMessage || isTyping) {
+      return
+    }
+
+    void sendMessage(lastFailedMessage)
   }
 
   return (
@@ -1082,7 +1164,7 @@ function AssistantPage() {
 
         <div className="suggestion-row">
           {suggestions.map((suggestion) => (
-            <button key={suggestion} type="button" className="secondary-button" onClick={() => sendMessage(suggestion)}>
+            <button key={suggestion} type="button" className="secondary-button" onClick={() => void sendMessage(suggestion)} disabled={isTyping}>
               {suggestion}
             </button>
           ))}
@@ -1094,14 +1176,23 @@ function AssistantPage() {
               {message.content}
             </div>
           ))}
-          {isPending ? <div className="chat-bubble chat-assistant">L assistant prepare une reponse...</div> : null}
+          {isTyping ? <div className="chat-bubble chat-assistant">L assistant ecrit une reponse...</div> : null}
+          {chatError ? <p className="error-text">Erreur chat: {chatError}</p> : null}
         </div>
+
+        {lastFailedMessage ? (
+          <div className="button-row">
+            <button className="secondary-button" type="button" onClick={retryLastMessage} disabled={isTyping}>
+              Reessayer le dernier message
+            </button>
+          </div>
+        ) : null}
 
         <form
           className="chat-form"
           onSubmit={(event) => {
             event.preventDefault()
-            sendMessage(input)
+            void sendMessage(input)
           }}
         >
           <input
@@ -1110,8 +1201,11 @@ function AssistantPage() {
             onChange={(event) => setInput(event.target.value)}
             placeholder="Ecrire un message"
             aria-label="Ecrire un message"
+            disabled={isTyping}
           />
-          <button className="primary-button" type="submit">Envoyer</button>
+          <button className="primary-button" type="submit" disabled={isTyping || !input.trim()}>
+            {isTyping ? 'Envoi...' : 'Envoyer'}
+          </button>
         </form>
       </article>
     </section>
