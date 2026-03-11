@@ -128,6 +128,7 @@ db.exec(`
     unit TEXT NOT NULL,
     expiry_date TEXT NOT NULL,
     critical_threshold INTEGER NOT NULL,
+    is_deleted INTEGER NOT NULL DEFAULT 0,
     location TEXT NOT NULL DEFAULT '',
     notes TEXT NOT NULL DEFAULT '',
     FOREIGN KEY (medicine_id) REFERENCES medicines (id),
@@ -146,6 +147,14 @@ db.exec(`
     FOREIGN KEY (profile_id) REFERENCES profiles (id)
   );
 `)
+
+// Lightweight migration for existing databases created before soft-delete support.
+const stockItemsColumns = db.prepare(`PRAGMA table_info(stock_items)`).all() as Array<{ name: string }>
+const hasIsDeletedColumn = stockItemsColumns.some((column) => column.name === 'is_deleted')
+
+if (!hasIsDeletedColumn) {
+  db.exec(`ALTER TABLE stock_items ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0`)
+}
 
 const seeded = db.prepare('SELECT COUNT(*) AS count FROM profiles').get() as { count: number }
 
@@ -295,6 +304,7 @@ export function listInventory(search = '', status?: InventoryStatus) {
     FROM stock_items
     JOIN medicines ON medicines.id = stock_items.medicine_id
     LEFT JOIN profiles ON profiles.id = stock_items.profile_id
+    WHERE stock_items.is_deleted = 0
     ORDER BY medicines.name ASC
   `).all() as InventoryRow[]
 
@@ -334,7 +344,7 @@ function getInventoryItemById(stockItemId: number) {
     FROM stock_items
     JOIN medicines ON medicines.id = stock_items.medicine_id
     LEFT JOIN profiles ON profiles.id = stock_items.profile_id
-    WHERE stock_items.id = ?
+    WHERE stock_items.id = ? AND stock_items.is_deleted = 0
   `).get(stockItemId) as InventoryRow | undefined
 }
 
@@ -367,7 +377,7 @@ export function applyInventoryAction(input: InventoryActionInput): InventoryActi
       quantity,
       profile_id AS profileId
     FROM stock_items
-    WHERE id = ?
+    WHERE id = ? AND is_deleted = 0
   `).get(input.stockItemId) as { id: number, quantity: number, profileId: number | null } | undefined
 
   if (!stockItem) {
@@ -456,7 +466,7 @@ export function updateInventory(id: number, input: InventoryMutationInput) {
   const existing = db.prepare(`
     SELECT medicine_id AS medicineId
     FROM stock_items
-    WHERE id = ?
+    WHERE id = ? AND is_deleted = 0
   `).get(id) as { medicineId: number } | undefined
 
   if (!existing) {
@@ -498,26 +508,20 @@ export function deleteInventory(id: number) {
   const existing = db.prepare(`
     SELECT medicine_id AS medicineId
     FROM stock_items
-    WHERE id = ?
+    WHERE id = ? AND is_deleted = 0
   `).get(id) as { medicineId: number } | undefined
 
   if (!existing) {
     return false
   }
 
-  db.prepare('DELETE FROM stock_items WHERE id = ?').run(id)
+  const result = db.prepare(`
+    UPDATE stock_items
+    SET is_deleted = 1
+    WHERE id = ? AND is_deleted = 0
+  `).run(id)
 
-  const linkedStockCount = db.prepare(`
-    SELECT COUNT(*) AS count
-    FROM stock_items
-    WHERE medicine_id = ?
-  `).get(existing.medicineId) as { count: number }
-
-  if (linkedStockCount.count === 0) {
-    db.prepare('DELETE FROM medicines WHERE id = ?').run(existing.medicineId)
-  }
-
-  return true
+  return result.changes > 0
 }
 
 export function listMovements(filters: MovementFilters = {}) {
