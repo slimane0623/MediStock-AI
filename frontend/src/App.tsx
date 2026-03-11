@@ -121,11 +121,11 @@ const alerts: Alert[] = [
 ]
 
 const navigation = [
-  { to: '/', label: 'Tableau de bord', shortLabel: 'Dashboard' },
-  { to: '/inventaire', label: 'Inventaire', shortLabel: 'Inventaire' },
-  { to: '/assistant', label: 'Assistant IA', shortLabel: 'Assistant' },
+  { to: '/', label: 'Dashboard', shortLabel: 'Home' },
+  { to: '/inventaire', label: 'Inventaire', shortLabel: 'Stock' },
   { to: '/profils', label: 'Profils', shortLabel: 'Profils' },
-  { to: '/historique', label: 'Historique', shortLabel: 'Historique' },
+  { to: '/historique', label: 'Historique', shortLabel: 'Logs' },
+  { to: '/assistant', label: 'Assistant IA', shortLabel: 'IA' },
 ]
 
 const profileRoles = [
