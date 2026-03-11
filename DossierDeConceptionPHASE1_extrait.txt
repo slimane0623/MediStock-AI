@@ -1,0 +1,1703 @@
+
+
+===== PAGE 1 =====
+ 
+Dossier  de  Conception  du  Projet  
+MediStock  AI  :  Gestionnaire  de  Stock  de  Pharmacie  
+Familiale
+ 
+Intelligent
+ 
+ 
+Réalisé  par  :  ●  Mohamed  DE  FRANCESCHI  ●  Hugo  HAMMER  
+Classe  :  M1  MIAGE/INFO  
+Date  de  remise  :  05/03/2026    
+
+
+
+===== PAGE 2 =====
+ 
+SOMMAIRE   I.  Objectifs  du  projet .............................................................................................................. 2 1.  Le  Contexte  et  la  Problématique .................................................................................... 2 2.  La  Solution  :  MediStock  AI ............................................................................................. 2 3.  Objectifs  Techniques ...................................................................................................... 2 4.  Valeur  Ajoutée  Attendue ................................................................................................. 3 II.  Acteurs  et  Cas  d'Utilisation ............................................................................................... 4 1.  Futurs  utilisateurs ........................................................................................................... 4 5.  Diagramme  de  Cas  d'Utilisation ..................................................................................... 5 III.  Spécifications  Fonctionnelles ......................................................................................... 6 1.  Fonctionnalités  principales ............................................................................................. 6 1.  Tableau  de  bord  (Dashboard) ................................................................................... 6 2.  Inventaire  &  Gestion  du  stock .................................................................................. 6 3.  Gestion  des  profils  familiaux .................................................................................... 6 4.  Historique  des  mouvements ..................................................................................... 6 5.  Navigation  &  Interface .............................................................................................. 7 2.  Fonctionnalité  IA ............................................................................................................. 7 IV.  Architecture  Technique  et  Données ................................................................................ 8 1.  Systèmes  utilisés ............................................................................................................ 8 2.  Données  à  stocker ......................................................................................................... 9 A.  Dictionnaire  des  Entités ..................................................................................... 9 B.  Relations  et  Dynamique  des  données ............................................................. 10 V.  Conception  de  l'Interface  (IHM) ....................................................................................... 11 VI.  Contraintes  Générales ................................................................................................... 13 1.  Temps  de  réponse ........................................................................................................ 13 2.  Contraintes  mémoire  et  stockage ................................................................................. 13 VII.  Pilotage  du  Projet .......................................................................................................... 14 1.  Planning  prévisionnel ................................................................................................... 14 2.  Étude  de  risque ............................................................................................................ 14 VIII.  Cahier  de  Recette ......................................................................................................... 16 1.  Plateforme  de  test  cible ................................................................................................ 16 2.  Scénarios  Techniques .................................................................................................. 16 IX.  Dossier  de  Conception  Préliminaire ............................................................................. 17 1.  Schéma  d'architecture  des  Flux ................................................................................... 17  
+ 
+
+
+===== PAGE 3 =====
+ 
+I.  Objectifs  du  projet  
+ 
+1.  Le  Contexte  et  la  Problématique  
+La  gestion  de  l'armoire  à  pharmacie  personnelle  est  souvent  source  de  désorganisation  et  
+de
+ 
+risques
+ 
+sanitaires
+ 
+au
+ 
+sein
+ 
+des
+ 
+foyers.
+ 
+Les
+ 
+utilisateurs
+ 
+sont
+ 
+confrontés
+ 
+à
+ 
+une
+ 
+réalité
+ 
+chaotique
+ 
+:
+ 
+boîtes
+ 
+entamées
+ 
+dispersées,
+ 
+médicaments
+ 
+périmés
+ 
+non
+ 
+identifiés,
+ 
+ordonnances
+ 
+égarées
+ 
+et
+ 
+notices
+ 
+d'utilisation
+ 
+perdues.
+ 
+De  plus,  une  problématique  spécifique  touche  les  personnes  souffrant  de  pathologies  
+chroniques
+ 
+ou
+ 
+passagères.
+ 
+Pour
+ 
+ces
+ 
+patients,
+ 
+anticiper
+ 
+le
+ 
+renouvellement
+ 
+des
+ 
+traitements
+ 
+avant
+ 
+la
+ 
+rupture
+ 
+de
+ 
+stock
+ 
+demande
+ 
+une
+ 
+charge
+ 
+mentale
+ 
+importante
+ 
+et
+ 
+une
+ 
+vigilance
+ 
+constante.
+ 
+Le  projet  MediStock  AI  naît  de  ce  constat  :  il  manque  un  outil  capable  d'allier  la  rigueur  d'une  
+gestion
+ 
+de
+ 
+stock
+ 
+comptable
+ 
+à
+ 
+la
+ 
+simplicité
+ 
+d'une
+ 
+assistance
+ 
+intelligente
+ 
+pour
+ 
+sécuriser
+ 
+la
+ 
+santé
+ 
+au
+ 
+quotidien.
+ 
+ 
+2.  La  Solution  :  MediStock  AI  
+L’objectif  est  de  concevoir  et  développer  une  application  agissant  comme  un  "gestionnaire  
+de
+ 
+stock
+ 
+intelligent
+ 
+et
+ 
+infaillible".
+ 
+L'application
+ 
+repose
+ 
+sur
+ 
+une
+ 
+architecture
+ 
+hybride
+ 
+distinguant
+ 
+strictement
+ 
+deux
+ 
+volets
+ 
+techniques
+ 
+:
+ 
+1.  Le  moteur  de  gestion  (Core)  :  Une  gestion  rigoureuse  pour  garantir  l'exactitude  des  
+stocks
+ 
+(décrémentation
+ 
+mathématique,
+ 
+suivi
+ 
+des
+ 
+péremptions).
+ 2.  L'assistant  intelligent  (IA)  :  Une  couche  d'Intelligence  Artificielle  servant  d'interface  
+de
+ 
+compréhension
+ 
+(NLP)
+ 
+et
+ 
+de
+ 
+vulgarisation
+ 
+médicale,
+ 
+sans
+ 
+jamais
+ 
+intervenir
+ 
+directement
+ 
+sur
+ 
+les
+ 
+calculs
+ 
+critiques
+ 
+d'inventaire.
+ 
+ 
+3.  Objectifs  Techniques  
+Ce  projet  vise  à  mobiliser  des  compétences  avancées  en  génie  logiciel  à  travers  les  axes  
+suivants
+ 
+:
+ 
+●  Gestion  de  données  (CRUD)  :  Mise  en  œuvre  d'une  base  de  données  robuste  pour  
+assurer
+ 
+la
+ 
+persistance
+ 
+et
+ 
+l'intégrité
+ 
+des
+ 
+données
+ 
+critiques
+ 
+(médicaments,
+ 
+utilisateurs,
+ 
+mouvements
+ 
+de
+ 
+stock).
+ ●  Intelligence  Artificielle  Embarquée  (Edge  AI)  :  Intégration  d'un  moteur  LLM  (Large  
+Language
+ 
+Model)
+ 
+déployé
+ 
+de
+ 
+manière
+ 
+hermétique
+ 
+(exécution
+ 
+locale).
+ 
+Ce
+ 
+choix
+ 
+2  
+
+
+===== PAGE 4 =====
+ 
+technique  est  stratégique  :  il  garantit  la  confidentialité  totale  des  données  de  santé,  
+aucune
+ 
+information
+ 
+ne
+ 
+transitant
+ 
+par
+ 
+des
+ 
+serveurs
+ 
+tiers.
+ ●  Qualité  Logicielle  :  Adoption  d'une  architecture  logicielle  propre  (Clean  Architecture)  
+et
+ 
+documentation
+ 
+rigoureuse
+ 
+pour
+ 
+permettre
+ 
+la
+ 
+reprise
+ 
+par
+ 
+les
+ 
+équipes
+ 
+suivantes
+ 
+(permutations).
+ 
+ 
+4.  Valeur  Ajoutée  Attendue  
+Le  produit  final  devra  offrir  trois  garanties  majeures  :  
+●  Sécurité  :  Alertes  proactives  sur  les  péremptions  et  les  ruptures  de  stock  pour  éviter  
+les
+ 
+accidents
+ 
+ou
+ 
+les
+ 
+interruptions
+ 
+de
+ 
+traitement.
+ ●  Accessibilité  :  Saisie  simplifiée  par  langage  naturel  (ex:  "J'ai  pris  deux  Doliprane")  
+interprétée
+ 
+par
+ 
+le
+ 
+LLM
+ 
+pour
+ 
+réduire
+ 
+l'effort
+ 
+utilisateur.
+ ●  Confidentialité  :  Respect  strict  de  la  vie  privée  grâce  à  l'isolation  totale  du  modèle  
+d'IA
+ 
+(Privacy
+ 
+by
+ 
+design).
+ 
+ 
+3  
+
+
+===== PAGE 5 =====
+ 
+II.  Acteurs  et  Cas  d'Utilisation  
+ 
+1.  Futurs  utilisateurs  
+Futurs  utilisateurs  et  Bénéficiaires  L'application  s'adresse  à  un  utilisateur  physique  
+unique
+,
+ 
+mais
+ 
+permet
+ 
+de
+ 
+gérer
+ 
+la
+ 
+santé
+ 
+de
+ 
+différents
+ 
+profils
+ 
+au
+ 
+sein
+ 
+d'un
+ 
+même
+ 
+foyer.
+ 
+1.  L'Utilisateur  Principal  :  Le  Gestionnaire  de  Foyer  
+●  Description  :  C'est  la  personne  qui  détient  l'appareil  (téléphone  ou  ordinateur)  et  qui  
+manipule
+ 
+l'application.
+ 
+Il
+ 
+est
+ 
+en
+ 
+charge
+ 
+de
+ 
+la
+ 
+santé
+ 
+de
+ 
+toute
+ 
+la
+ 
+famille
+ 
+(parent
+ 
+ou
+ 
+aidant).
+ ●  Usage  de  l'app  :  Enregistre  les  boîtes  de  médicaments,  interroge  l'IA  sur  les  notices,  
+et
+ 
+crée
+ 
+des
+ 
+fiches/profils
+ 
+pour
+ 
+chaque
+ 
+membre
+ 
+de
+ 
+sa
+ 
+famille
+ 
+afin
+ 
+de
+ 
+leur
+ 
+attribuer
+ 
+leurs
+ 
+traitements.
+ 
+2.  Les  Profils  "Bénéficiaires"  (Gérés  en  interne)   
+Bien  qu'ils  ne  manipulent  pas  directement  l'application,  le  Gestionnaire  peut  créer  des  
+espaces
+ 
+(tags)
+ 
+dédiés
+ 
+pour
+ 
+répondre
+ 
+aux
+ 
+besoins
+ 
+spécifiques
+ 
+de
+ 
+ses
+ 
+proches
+ 
+:
+ 
+2.  Le  Patient  Chronique  :  Le  gestionnaire  crée  ce  profil  pour  suivre  le  traitement  strict  
+d'un
+ 
+proche
+ 
+(ex:
+ 
+conjoint
+ 
+diabétique).
+ 
+En
+ 
+cliquant
+ 
+sur
+ 
+ce
+ 
+profil,
+ 
+il
+ 
+voit
+ 
+uniquement
+ 
+les
+ 
+médicaments
+ 
+associés
+ 
+et
+ 
+les
+ 
+alertes
+ 
+de
+ 
+rupture
+ 
+spécifiques.
+ 3.  L'Enfant  :  Un  profil  avec  le  poids  et  l'âge  enregistrés  pour  aider  l'IA  à  vérifier  les  
+dosages
+ 
+des
+ 
+sirops.
+ 4.  La  Personne  Âgée  /  Dépendante  :  Un  profil  dédié  (tag)  permettant  au  gestionnaire  
+de
+ 
+centraliser
+ 
+le
+ 
+suivi
+ 
+des
+ 
+traitements
+ 
+lourds
+ 
+de
+ 
+ce
+ 
+proche,
+ 
+et
+ 
+d'utiliser
+ 
+l'assistant
+ 
+IA
+ 
+pour
+ 
+vérifier
+ 
+facilement
+ 
+les
+ 
+contre-indications
+ 
+ou
+ 
+vulgariser
+ 
+les
+ 
+notices
+ 
+de
+ 
+ces
+ 
+nombreux
+ 
+médicaments.
+ 
+ 
+4  
+
+
+===== PAGE 6 =====
+ 
+5.  Diagramme  de  Cas  d'Utilisation  
+5  
+
+
+
+===== PAGE 7 =====
+ 
+III.  Spécifications  Fonctionnelles  
+ 
+1.  Fonctionnalités  principales  
+ 
+1.  Tableau  de  bord  (Dashboard)  
+Le  dashboard  offre  une  vue  d'ensemble  en  temps  réel  de  l'état  de  la  pharmacie  familiale  :  
+●  4  cartes  de  statistiques  :  nombre  total  de  médicaments,  stocks  critiques,  
+médicaments
+ 
+proches
+ 
+de
+ 
+la
+ 
+péremption
+ 
+et
+ 
+ruptures
+ 
+de
+ 
+stock
+ ●  Graphique  en  barres  (Recharts)  visualisant  les  niveaux  de  stock  par  médicament  ●  Liste  des  alertes  actives  (péremption,  stock  bas,  rupture)  avec  un  code  couleur  par  
+sévérité
+ ●  Timeline  des  derniers  mouvements  (prises,  ajouts)  ●  Accès  rapide  aux  profils  familiaux  
+2.  Inventaire  &  Gestion  du  stock  
+Interface  complète  de  gestion  des  médicaments  :  
+●  Grille  visuelle  avec  barres  de  progression  indiquant  le  niveau  de  stock  ●  Recherche  textuelle  par  nom  de  médicament  ●  Filtres  par  statut  :  critique,  proche  péremption,  rupture  de  stock  ●  Formulaire  d'ajout  via  une  fenêtre  modale  (dialog)  ●  Fiche  détaillée  en  panneau  latéral  (Sheet)  :  dosage,  forme  galénique,  date  de  
+péremption,
+ 
+emplacement,
+ 
+notes
+ ●  Actions  rapides  depuis  la  fiche  :  enregistrer  une  prise  ou  ajouter  du  stock  
+3.  Gestion  des  profils  familiaux  
+Suivi  personnalisé  pour  chaque  membre  du  foyer  :  
+●  4  types  de  profils  :  Gestionnaire  principal,  Patient  chronique,  Senior,  Aidant  familial  ●  Fiche  détaillée  par  profil  avec  la  liste  des  médicaments  associés  ●  Formulaire  de  création  de  profil  (type,  nom,  date  de  naissance,  allergies,  notes)  ●  Badge  de  rôle  coloré  selon  le  type  de  profil  
+4.  Historique  des  mouvements  
+Traçabilité  complète  de  toutes  les  actions  :  
+●  Timeline  chronologique  groupée  par  jour  ●  Filtres  par  type  de  mouvement  (prise,  ajout,  retrait,  alerte)  et  par  profil  
+6  
+
+
+===== PAGE 8 =====
+ 
+●  Statistiques  mensuelles  en  en-tête  :  prises,  ajouts,  alertes  déclenchées,  
+médicaments
+ 
+distincts
+ ●  Icônes  et  couleurs  différenciées  selon  le  type  d'action  
+5.  Navigation  &  Interface  
+●  Sidebar  desktop  avec  icônes  et  labels  pour  naviguer  entre  les  5  sections  ●  Barre  de  navigation  mobile  en  bas  d'écran  (responsive)  ●  Barre  supérieure  avec  recherche  globale,  notifications  (badge  compteur)  et  avatar  
+utilisateur
+ 
+    
+2.  Fonctionnalité  IA  
+ 
+Interface  de  chat  intelligente  intégrée  à  l'application  :  
+●  Bulles  de  conversation  distinctes  entre  l'utilisateur  et  l'assistant  ●  Suggestions  rapides  cliquables  :  "Vérifier  interactions",  "Enregistrer  une  prise",  
+"Stock
+ 
+faible",
+ 
+"Prochain
+ 
+renouvellement"
+ ●  Indicateur  de  saisie  ( typing  indicator )  pendant  le  traitement  de  la  réponse  ●  Message  d'accueil  présentant  les  capacités  de  l'assistant  ●  Zone  de  saisie  avec  bouton  d'envoi  
+          
+ 
+7  
+
+
+===== PAGE 9 =====
+ 
+IV.  Architecture  Technique  et  Données  
+ 
+1.  Systèmes  utilisés  
+ Dans  le  cadre  de  notre  méthodologie  Agile,  le  choix  définitif  des  langages  et  des  frameworks  
+de
+ 
+développement
+ 
+est
+ 
+laissé
+ 
+à
+ 
+l'appréciation
+ 
+de
+ 
+l'équipe
+ 
+en
+ 
+charge
+ 
+de
+ 
+la
+ 
+réalisation,
+ 
+selon
+ 
+ses
+ 
+affinités
+ 
+et
+ 
+compétences.
+ 
+Cependant,  pour  respecter  le  cahier  des  charges,  l'application  MediStock  AI  doit  
+impérativement
+ 
+respecter
+ 
+une
+ 
+architecture
+ 
+en
+ 
+trois
+ 
+grands
+ 
+pôles,
+ 
+avec
+ 
+des
+ 
+contraintes
+ 
+technologiques
+ 
+et
+ 
+de
+ 
+sécurité
+ 
+strictes
+ 
+:
+ 
+1.  L'Interface  Utilisateur  (Frontend  /  Application  Client)  
+●  Rôle  :  Fournir  une  interface  fluide  pour  gérer  le  stock  et  interagir  avec  l'assistant  
+(chat).
+ ●  Contrainte  :  L'interface  doit  pouvoir  s'exécuter  sur  une  machine  grand  public  
+(smartphone
+ 
+ou
+ 
+navigateur)
+ 
+et
+ 
+s'adapter
+ 
+à
+ 
+la
+ 
+taille
+ 
+de
+ 
+l'écran
+ 
+(Responsive
+ 
+Design).
+ ●  Recommandations  (au  choix)  :  ○  Développement  mobile  cross-platform  :  Flutter  ou  React  Native .  ○  Application  Web  :  React ,  Vue.js  ou  HTML/CSS/JS .  
+2.  Le  Moteur  de  Gestion  et  Base  de  Données  (Backend  /  Core  Local)  
+●  Rôle  :  Exécuter  les  opérations  CRUD  strictes  (ajout,  suppression,  modification),  
+calculer
+ 
+les
+ 
+dates
+ 
+de
+ 
+péremption,
+ 
+et
+ 
+gérer
+ 
+la
+ 
+répartition
+ 
+des
+ 
+médicaments
+ 
+entre
+ 
+les
+ 
+différents
+ 
+profils
+ 
+familiaux
+ 
+créés.
+ ●  Contrainte  d'Architecture  "Mono-utilisateur  /  Multi-profils"  :  L'application  ne  
+possède
+ 
+aucune
+ 
+authentification
+ 
+ni
+ 
+hébergement
+ 
+Cloud
+.
+ 
+La
+ 
+base
+ 
+de
+ 
+données
+ 
+doit
+ 
+obligatoirement
+ 
+être
+ 
+hébergée
+ 
+localement
+ 
+sur
+ 
+l'appareil
+ 
+de
+ 
+l'utilisateur
+ 
+(100%
+ 
+hors-ligne)
+ 
+pour
+ 
+garantir
+ 
+le
+ 
+"Privacy
+ 
+by
+ 
+Design".
+ ●  Gestion  des  données  :  La  base  de  données  stocke  les  médicaments  et  permet  de  
+les
+ 
+lier
+ 
+à
+ 
+des
+ 
+entités
+ 
+"Profils"
+ 
+(conjoint,
+ 
+enfants)
+ 
+créées
+ 
+par
+ 
+le
+ 
+gestionnaire.
+ ●  Recommandations  (au  choix)  :  ○  Langage  Backend  :  Python  (via  FastAPI),  Node.js,  ou  gestion  directe  via  le  
+framework
+ 
+Frontend.
+ ○  Base  de  données  :  SQLite  (fortement  recommandé  car  léger,  embarqué  et  
+parfait
+ 
+pour
+ 
+un
+ 
+stockage
+ 
+local
+ 
+sans
+ 
+serveur).
+ 
+3.  Le  Moteur  d'Intelligence  Artificielle  (Edge  AI  /  LLM  Local)  
+●  Rôle  :  Interpréter  le  langage  naturel  (NLP)  pour  les  saisies  complexes  et  vulgariser  
+les
+ 
+notices
+ 
+médicales.
+ ●  Contrainte  absolue  :  Même  si  la  base  de  données  est  en  ligne,  le  LLM  (Large  
+Language
+ 
+Model)
+ 
+doit
+ 
+s'exécuter
+ 
+localement
+ 
+sur
+ 
+la
+ 
+machine
+ 
+de
+ 
+l'utilisateur
+ 
+8  
+
+
+===== PAGE 10 =====
+ 
+(approche  Edge  AI).  L'utilisation  d'API  externes  d'IA  (comme  OpenAI/ChatGPT  ou  
+Google
+ 
+Gemini)
+ 
+est
+ 
+interdite
+ 
+pour
+ 
+garantir
+ 
+que
+ 
+les
+ 
+conversations
+ 
+textuelles
+ 
+ou
+ 
+vocales
+ 
+liées
+ 
+à
+ 
+la
+ 
+santé
+ 
+ne
+ 
+soient
+ 
+pas
+ 
+analysées
+ 
+par
+ 
+des
+ 
+tiers.
+ ●  Recommandations  (au  choix)  :  ○  Moteur  d'exécution  :  Ollama  ou  Llama.cpp .  ○  Modèles  d'IA  :  Modèles  open-source  "quantizés"  (Mistral-7B-Instruct,  
+Llama-3-8B
+ 
+ou
+ 
+CroissantLLM).
+ 
+ 
+2.  Données  à  stocker   Afin  de  ne  pas  brider  les  choix  techniques  de  l'équipe  de  développement  (Binôme  2)  quant  à  
+l'utilisation
+ 
+d'une
+ 
+base
+ 
+de
+ 
+données
+ 
+relationnelle
+ 
+(SQL)
+ 
+ou
+ 
+orientée
+ 
+document
+ 
+(NoSQL),
+ 
+les
+ 
+données
+ 
+à
+ 
+stocker
+ 
+sont
+ 
+présentées
+ 
+ici
+ 
+sous
+ 
+forme
+ 
+d'entités
+ 
+logiques
+ 
+et
+ 
+d'associations.
+ 
+Le  modèle  repose  sur  quatre  entités  majeures  permettant  de  garantir  le  suivi  des  stocks  et  
+de
+ 
+fournir
+ 
+suffisamment
+ 
+de
+ 
+contexte
+ 
+à
+ 
+l'assistant
+ 
+IA.
+ 
+A.  Dictionnaire  des  Entités  1.  L'entité  "Profil  /  Bénéficiaire"  (Le  tag)  
+Représente  les  membres  du  foyer  pour  lesquels  des  traitements  sont  suivis.  
+●  Identifiant  :  ID  unique  du  profil.  ●  Nom  :  Prénom  ou  surnom  (ex  :  "Grand-père",  "Léo").  ●  Catégorie  :  Typologie  (ex  :  Adulte,  Enfant,  Senior,  Animal  de  compagnie).  ●  Poids  :  Donnée  numérique  (optionnelle,  mais  cruciale  pour  aider  l'IA  à  vérifier  
+les
+ 
+posologies
+ 
+pédiatriques).
+ ●  Contexte  médical  :  Notes  textuelles  libres  (allergies,  antécédents)  utiles  à  
+l'IA
+ 
+pour
+ 
+vérifier
+ 
+les
+ 
+contre-indications.
+ 
+2.  L'entité  "Fiche  Médicament"  (Le  catalogue)  
+Représente  la  carte  d'identité  théorique  du  produit  de  santé,  indépendamment  de  la  
+boîte
+ 
+physique.
+ 
+●  Identifiant  :  ID  unique  ou  Code  CIP  (Code  Identifiant  de  Présentation).  ●  Nom  commercial  :  (ex  :  Doliprane).  ●  Substance  active  :  Molécule  principale  (ex  :  Paracétamol),  donnée  
+essentielle
+ 
+pour
+ 
+détecter
+ 
+les
+ 
+surdosages
+ 
+via
+ 
+l'IA.
+ ●  Dosage  :  (ex  :  1000  mg).  ●  Forme  galénique  :  (ex  :  Comprimé,  Sirop,  Gélule).  ●  Indications  :  Mots-clés  (ex  :  Douleur,  Fièvre).  
+3.  L'entité  "Stock  /  Boîte"  (L'inventaire  physique)  
+9  
+
+
+===== PAGE 11 =====
+ 
+Représente  une  boîte  physique  réellement  présente  dans  l'armoire  à  pharmacie.  
+C'est
+ 
+le
+ 
+cœur
+ 
+du
+ 
+système
+ 
+de
+ 
+gestion.
+ 
+●  Identifiant  :  ID  unique  de  la  boîte.  ●  Lien  Médicament  :  Référence  à  la  "Fiche  Médicament"  correspondante.  ●  Lien  Profil  :  Référence  au  profil  bénéficiaire,  ou  défini  sur  "Commun  /  Foyer"  
+si
+ 
+le
+ 
+médicament
+ 
+est
+ 
+partagé.
+ ●  Quantité  restante  :  Le  stock  actuel  dynamique  (ex:  5).  ●  Unité  de  mesure  :  (ex  :  comprimés,  ml,  sachets).  ●  Date  de  péremption  :  Pour  le  déclenchement  des  alertes  (Format  
+JJ/MM/AAAA).
+ ●  Seuil  critique  :  Quantité  minimale  à  partir  de  laquelle  l'application  génère  
+une
+ 
+alerte
+ 
+de
+ 
+rupture.
+ 
+4.  L'entité  "Événement  /  Historique"  (La  traçabilité)  
+Représente  chaque  action  effectuée  pour  construire  la  "Timeline"  du  tableau  de  bord.  
+●  Identifiant  :  ID  unique  du  mouvement.  ●  Horodatage  :  Date  et  heure  exactes  de  l'action.  ●  Type  d'action  :  (ex  :  "Nouvel  ajout",  "Prise",  "Jeté  car  périmé").  ●  Variation  :  Impact  sur  le  stock  (ex  :  +1  boîte,  -2  comprimés).  ●  Lien  Stock  :  Référence  à  la  boîte  impactée.  
+B.  Relations  et  Dynamique  des  données  Peu  importe  la  technologie  de  stockage  choisie  en  phase  de  développement,  le  système  
+devra
+ 
+respecter
+ 
+les
+ 
+relations
+ 
+logiques
+ 
+suivantes
+ 
+:
+ 
+●  Unité  et  Multiplicité  :  *  Un  Profil  peut  être  associé  à  0  ou  plusieurs  Boîtes  en  
+stock.
+ ○  Une  Fiche  Médicament  peut  correspondre  à  0  ou  plusieurs  Boîtes  
+physiques
+ 
+(ex
+ 
+:
+ 
+on
+ 
+peut
+ 
+avoir
+ 
+deux
+ 
+boîtes
+ 
+de
+ 
+Doliprane
+ 
+entamées
+ 
+en
+ 
+même
+ 
+temps).
+ ○  Une  Boîte  possède  0  ou  plusieurs  Événements  dans  son  historique.  ●  Ségrégation  de  l'affichage  :  Les  requêtes  de  lecture  devront  permettre  de  filtrer  
+instantanément
+ 
+les
+ 
+"Boîtes"
+ 
+et
+ 
+"Événements"
+ 
+en
+ 
+fonction
+ 
+du
+ 
+"Profil"
+ 
+sélectionné
+ 
+par
+ 
+le
+ 
+gestionnaire.
+ ●  Sécurité  de  suppression  :  La  suppression  d'une  "Boîte"  (parce  qu'elle  est  vide)  ne  
+doit
+ 
+pas
+ 
+entraîner
+ 
+la
+ 
+suppression
+ 
+de
+ 
+son
+ 
+"Historique"
+ 
+ni
+ 
+de
+ 
+sa
+ 
+"Fiche
+ 
+Médicament"
+ 
+associée,
+ 
+afin
+ 
+de
+ 
+conserver
+ 
+la
+ 
+traçabilité
+ 
+des
+ 
+traitements
+ 
+pris.
+ 
+10  
+
+
+===== PAGE 12 =====
+ 
+V.  Conception  de  l'Interface  (IHM)  
+ 
+ 
+ 
+11  
+
+
+
+===== PAGE 13 =====
+ 
+  
+ 
+12  
+
+
+
+===== PAGE 14 =====
+ 
+VI.  Contraintes  Générales  
+ 
+1.  Temps  de  réponse
+ 
+L'interface  doit  garantir  une  expérience  fluide  et  réactive.  Toutes  les  interactions  courantes  
+(navigation,
+ 
+recherche,
+ 
+enregistrement
+ 
+d'une
+ 
+prise)
+ 
+doivent
+ 
+s'exécuter
+ 
+en
+ 
+moins
+ 
+de
+ 
+2
+ 
+secondes
+.
+ 
+Les
+ 
+opérations
+ 
+impliquant
+ 
+le
+ 
+moteur
+ 
+IA
+ 
+(traitement
+ 
+d'une
+ 
+requête
+ 
+en
+ 
+langage
+ 
+naturel)
+ 
+sont
+ 
+tolérées
+ 
+jusqu'à
+ 
+15
+ 
+secondes
+,
+ 
+compte
+ 
+tenu
+ 
+de
+ 
+l'exécution
+ 
+locale
+ 
+du
+ 
+modèle.
+ 
+ 
+2.  Contraintes  mémoire  et  stockage  
+La  seule  contrainte  stricte  concerne  le  moteur  IA  :  le  modèle  LLM  doit  impérativement  
+s'exécuter
+ 
+en
+ 
+local
+,
+ 
+sans
+ 
+aucune
+ 
+transmission
+ 
+des
+ 
+données
+ 
+de
+ 
+santé
+ 
+vers
+ 
+des
+ 
+serveurs
+ 
+externes.
+ 
+Cette
+ 
+exigence
+ 
+garantit
+ 
+la
+ 
+confidentialité
+ 
+totale
+ 
+des
+ 
+informations
+ 
+médicales
+ 
+des
+ 
+utilisateurs.
+ 
+L'empreinte  mémoire  de  l'application  doit  rester  raisonnable  afin  d'assurer  la  compatibilité  
+avec
+ 
+des
+ 
+appareils
+ 
+d'entrée
+ 
+de
+ 
+gamme,
+ 
+en
+ 
+particulier
+ 
+pour
+ 
+les
+ 
+profils
+ 
+seniors
+ 
+et
+ 
+personnes
+ 
+en
+ 
+perte
+ 
+d'autonomie
+ 
+qui
+ 
+constituent
+ 
+une
+ 
+cible
+ 
+prioritaire
+ 
+du
+ 
+projet.
+ 
+ 
+ 
+13  
+
+
+===== PAGE 15 =====
+ 
+VII.  Pilotage  du  Projet  
+ 
+1.  Planning  prévisionnel
+ 
+Sprint  Objectifs  
+Sprint  0  
+Initialisation  du  projet,  mise  en  place  de  l'environnement  de  développement,  définition  de  l'architecture  technique,  répartition  des  rôles  
+Sprint  1  
+Modélisation  de  la  base  de  données,  mise  en  place  du  backend  (API  CRUD),   gestion  des  rôles  
+Sprint  2  
+Développement  du  module  Inventaire,  gestion  des  profils  familiaux,  interface  frontend  de  base  
+Sprint  3  
+Intégration  du  moteur  LLM  local  (Ollama/Llama.cpp),  interface  de  chat,  traitement  du  langage  naturel  
+―  ―  livrable  minimum  ―  application  fonctionnelle  et  utilisable  en  conditions  réelles  ―  
+Sprint  4  
+Dashboard  avec  statistiques  et  alertes,  historique  des  mouvements,  système  de  notifications  
+Sprint  5  
+Responsive  design  avancé  (optimisation  mobile),  recherche  globale  et  filtres  combinés  
+Sprint  6  
+Tests  de  charge,  optimisation  des  performances  IA,  documentation  technique  finale   
+2.  Étude  de  risque  
+ #  Risque  Impact  Mesure  de  mitigation  
+R1  Performances  du  LLM  local  insuffisantes  sur  des  appareils  d'entrée  de  gamme  
+Élevé  Sélectionner  des  modèles  quantizés  légers  (ex.  Mistral  7B  Q4)  ;  définir  une  configuration  matérielle  minimale  recommandée  
+R2  Hallucinations  et  conseils  médicaux  erronés  dus  aux  limitations  du  modèle  LLM  local  
+Élevé  Ajouter  des  disclaimers  systématiques  sur  les  réponses  de  l'IA  ;  limiter  le  périmètre  de  l'assistant  aux  informations  de  stock  et  ne  jamais  substituer  un  avis  médical  professionnel  
+14  
+
+
+===== PAGE 16 =====
+ 
+R3  Saisie  des  médicaments  trop  longue  ou  fastidieuse ,  décourageant  les  utilisateurs  à  maintenir  leur  inventaire  à  jour  
+Moyen  Proposer  la  saisie  par  scan  de  code-barres  ou  photo  de  boîte  ;  pré-remplir  automatiquement  les  champs  via  une  base  de  données  médicamenteuse  ;  permettre  la  saisie  en  langage  naturel  via  l'assistant  IA  
+R4  Mauvaise  adoption  par  les  profils  seniors  due  à  une  interface  trop  complexe  
+Élevé  Intégrer  des  tests  utilisateurs  dès  le  Sprint  3  ;  simplifier  les  parcours  critiques  sur  la  base  des  retours   
+ 
+15  
+
+
+===== PAGE 17 =====
+ 
+VIII.  Cahier  de  Recette  
+ 
+1.  Plateforme  de  test  cible  
+Les  tests  de  recette  sont  réalisés  sur  la  plateforme  choisie  par  l'équipe  de  développement.  
+L'application
+ 
+devant
+ 
+s'adapter
+ 
+aux
+ 
+différents
+ 
+profils
+ 
+utilisateurs
+ 
+ciblés,
+ 
+la
+ 
+compatibilité
+ 
+est
+ 
+vérifiée
+ 
+sur
+ 
+au
+ 
+moins
+ 
+un
+ 
+environnement
+ 
+représentatif
+ 
+parmi
+ 
+les
+ 
+suivants
+ 
+:
+ 
+navigateur
+ 
+web
+ 
+moderne,
+ 
+application
+ 
+mobile
+ 
+(Android
+ 
+ou
+ 
+iOS)
+ 
+ou
+ 
+application
+ 
+desktop.
+ 
+Les
+ 
+tests
+ 
+valident
+ 
+le
+ 
+comportement
+ 
+responsive
+ 
+de
+ 
+l'interface
+ 
+sur
+ 
+différentes
+ 
+tailles
+ 
+d'écran
+ 
+(smartphone,
+ 
+tablette,
+ 
+desktop).
+  
+2.  Scénarios  Techniques
+ 
+#  Scénario  Entrée  Sortie  attendue  
+ST-01  Chargement  initial  de  l'application  
+Ouverture  de  l'URL  dans  le  navigateur  ou  de  l’application  
+L'interface  s'affiche  en  moins  de  2  secondes,  sans  erreur  console  
+ST-02  Gestion  des  profils  Création  et  suppression  de  profils  facil  
+L’utilisateur  voit  l'ensemble  du  foyer  et  peut  leur  attribuer  les  médicaments  dont  ils  ont  besoin   
+ST-03  Ajout  d'un  médicament  
+Formulaire  rempli  avec  nom,  dosage,  date  de  péremption,  quantité  
+Le  médicament  apparaît  dans  l'inventaire  avec  les  bonnes  informations  et  le  bon  niveau  de  stock  
+ST-04  Décrémentation  automatique  du  stock  
+Enregistrement  d'une  prise  via  l'interface  
+La  quantité  est  correctement  diminuée  ;  un  mouvement  est  ajouté  à  l'historique  
+ST-05  Déclenchement  des  alertes  
+Stock  d'un  médicament  descendu  sous  le  seuil  critique  ou  date  de  péremption  <  30  jours  
+Une  alerte  apparaît  sur  le  dashboard  avec  le  bon  code  couleur  et  la  bonne  sévérité  
+ST-06  Requête  en  langage  naturel  vers  l'assistant  IA  
+Saisie  de  "Est  ce  que  je  peux  prendre  ces  deux  medicament  ensemble"  dans  le  chat  
+Le  LLM  interprète  le  texte  et  répond  a  l’utilisateur  
+16  
+
+
+===== PAGE 18 =====
+ 
+ST-07  Fonctionnement  hors-ligne  
+Coupure  réseau  simulée  après  chargement  
+Les  données  locales  restent  accessibles  ;  aucune  perte  de  données  tout  est  en  local  
+ST-08  Responsive  design  Redimensionnement  de  la  fenêtre  ou  test  sur  mobile  
+La  sidebar  se  transforme  en  bottom  nav  ;  les  grilles  s'adaptent  sans  chevauchement  
+   
+IX.  Dossier  de  Conception  Préliminaire  
+  
+1.  Schéma  d'architecture  des  Flux  
+ 
+ 
+17  
+
