@@ -95,7 +95,7 @@ const alerts: Alert[] = [
 const navigation = [
   { to: '/', label: 'Dashboard', shortLabel: 'Home' },
   { to: '/inventaire', label: 'Inventaire', shortLabel: 'Stock' },
-  { to: '/profils', label: 'Profils', shortLabel: 'Profils' },
+  { to: '/profils', label: 'Beneficiaires', shortLabel: 'Benef.' },
   { to: '/historique', label: 'Historique', shortLabel: 'Logs' },
   { to: '/assistant', label: 'Assistant IA', shortLabel: 'IA' },
 ]
@@ -168,9 +168,14 @@ function Layout() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div>
-          <p className="eyebrow">MediStock AI</p>
-          <h1>Pharmacie familiale intelligente</h1>
+        <div className="sidebar-header">
+          <div className="logo-container">
+            <img src="/logo-medistock.svg" alt="MediStock AI" className="logo" />
+            <div>
+              <p className="eyebrow">MediStock AI</p>
+              <h1>Pharmacie familiale intelligente</h1>
+            </div>
+          </div>
           <p className="muted">Frontend React de demarrage, aligne sur la maquette cible.</p>
         </div>
 
@@ -256,6 +261,7 @@ function DashboardPage() {
           <div>
             <p className="eyebrow">Dashboard</p>
             <h3>Niveaux de stock</h3>
+            <p className="muted">Vue de pilotage pour le gestionnaire principal et les aidants familiaux.</p>
           </div>
         </div>
         <div className="chart-wrap">
@@ -315,7 +321,7 @@ function DashboardPage() {
         <div className="section-heading">
           <div>
             <p className="eyebrow">Famille</p>
-            <h3>Profils</h3>
+            <h3>Beneficiaires</h3>
           </div>
         </div>
         <div className="stack-list">
@@ -584,8 +590,8 @@ function ProfilesPage() {
       <article className="card">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Profils familiaux</p>
-            <h3>{editingId === null ? 'Creer un profil' : 'Modifier le profil'}</h3>
+            <p className="eyebrow">Beneficiaires familiaux</p>
+            <h3>{editingId === null ? 'Creer un beneficiaire' : 'Modifier le beneficiaire'}</h3>
           </div>
         </div>
 
@@ -603,7 +609,7 @@ function ProfilesPage() {
           </label>
 
           <label className="field-stack" htmlFor="profile-role">
-            <span>Type</span>
+            <span>Role du beneficiaire</span>
             <select
               id="profile-role"
               className="select-input"
@@ -615,6 +621,7 @@ function ProfilesPage() {
                 <option key={role} value={role}>{role}</option>
               ))}
             </select>
+            <small className="muted">Le role sert a classer la personne du foyer (pas un medecin ou un client externe).</small>
           </label>
 
           <label className="field-stack" htmlFor="profile-birth-date">
@@ -656,7 +663,7 @@ function ProfilesPage() {
 
           <div className="button-row">
             <button className="primary-button" type="submit" disabled={saving}>
-              {editingId === null ? 'Ajouter profil' : 'Enregistrer profil'}
+              {editingId === null ? 'Ajouter beneficiaire' : 'Enregistrer beneficiaire'}
             </button>
             {editingId !== null ? (
               <button className="secondary-button" type="button" onClick={resetForm} disabled={saving}>
@@ -671,15 +678,15 @@ function ProfilesPage() {
       <article className="card">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Liste profils</p>
-            <h3>{profileRows.length} profils</h3>
+            <p className="eyebrow">Liste beneficiaires</p>
+            <h3>{profileRows.length} beneficiaires</h3>
           </div>
           <button className="secondary-button" type="button" onClick={() => void loadProfiles()} disabled={loading || saving}>
             Rafraichir
           </button>
         </div>
 
-        {loading ? <p>Chargement des profils...</p> : null}
+        {loading ? <p>Chargement des beneficiaires...</p> : null}
 
         <div className="stack-list">
           {profileRows.map((profile) => (
