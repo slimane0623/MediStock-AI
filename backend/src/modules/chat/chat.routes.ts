@@ -5,6 +5,7 @@ import { ChatServiceError, chatTimeoutMs, generateLocalChatReply, getLocalModelS
 export const chatRouter = Router()
 
 const chatRoleSchema = z.enum(['user', 'assistant'])
+const chatProviderSchema = z.enum(['ollama', 'llama_cpp'])
 
 const chatRequestSchema = z.object({
   message: z.string().trim().min(1).max(1200),
@@ -15,26 +16,80 @@ const chatRequestSchema = z.object({
   requestId: z.string().trim().min(1).max(80).optional(),
 })
 
+const chatStatusResponseSchema = z.object({
+  ok: z.literal(true),
+  provider: chatProviderSchema,
+  model: z.string().min(1),
+  baseUrl: z.string().min(1),
+  available: z.boolean(),
+  reason: z.string().nullable(),
+  checkedAt: z.string().min(1),
+  timeoutMs: z.number().int().positive(),
+})
+
+const chatMetaSuccessSchema = z.object({
+  provider: z.string().min(1),
+  model: z.string().min(1),
+  latencyMs: z.number().int().nonnegative(),
+  timeoutMs: z.number().int().positive(),
+})
+
+const chatSuccessResponseSchema = z.object({
+  ok: z.literal(true),
+  requestId: z.string().nullable(),
+  reply: z.string().min(1),
+  disclaimer: z.string().min(1),
+  meta: chatMetaSuccessSchema,
+})
+
+const chatMetaFailureSchema = z.object({
+  provider: z.string().nullable(),
+  model: z.string().nullable(),
+  latencyMs: z.number().int().nonnegative(),
+  timeoutMs: z.number().int().positive(),
+})
+
+const chatFailureResponseSchema = z.object({
+  ok: z.literal(false),
+  requestId: z.string().nullable(),
+  error: z.object({
+    code: z.string().min(1),
+    message: z.string().min(1),
+  }),
+  meta: chatMetaFailureSchema,
+})
+
 chatRouter.get('/status', async (_request, response) => {
   const status = await getLocalModelStatus()
 
-  response.json({
+  const payload = chatStatusResponseSchema.parse({
     ok: true,
     ...status,
   })
+
+  response.json(payload)
 })
 
 chatRouter.post('/', async (request, response) => {
   const parsed = chatRequestSchema.safeParse(request.body)
 
   if (!parsed.success) {
-    response.status(400).json({
+    const payload = chatFailureResponseSchema.parse({
       ok: false,
+      requestId: null,
       error: {
         code: 'INVALID_PAYLOAD',
         message: 'Invalid chat payload',
       },
+      meta: {
+        provider: null,
+        model: null,
+        latencyMs: 0,
+        timeoutMs: chatTimeoutMs,
+      },
     })
+
+    response.status(400).json(payload)
     return
   }
 
@@ -46,7 +101,7 @@ chatRouter.post('/', async (request, response) => {
       history: parsed.data.history,
     })
 
-    response.json({
+    const payload = chatSuccessResponseSchema.parse({
       ok: true,
       requestId: parsed.data.requestId ?? null,
       reply: reply.reply,
@@ -58,20 +113,24 @@ chatRouter.post('/', async (request, response) => {
         timeoutMs: chatTimeoutMs,
       },
     })
+
+    response.json(payload)
   } catch (error) {
     const isChatError = error instanceof ChatServiceError
     const code = isChatError ? error.code : 'INTERNAL_ERROR'
-    const statusCode = code === 'TIMEOUT'
-      ? 504
-      : code === 'MODEL_UNAVAILABLE'
-        ? 503
-        : 500
+    let statusCode = 500
+
+    if (code === 'TIMEOUT') {
+      statusCode = 504
+    } else if (code === 'MODEL_UNAVAILABLE' || code === 'RESOURCE_EXHAUSTED') {
+      statusCode = 503
+    }
 
     const message = isChatError
       ? error.message
       : 'Erreur interne du service de chat local.'
 
-    response.status(statusCode).json({
+    const payload = chatFailureResponseSchema.parse({
       ok: false,
       requestId: parsed.data.requestId ?? null,
       error: {
@@ -85,5 +144,7 @@ chatRouter.post('/', async (request, response) => {
         timeoutMs: chatTimeoutMs,
       },
     })
+
+    response.status(statusCode).json(payload)
   }
 })

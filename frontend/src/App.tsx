@@ -101,6 +101,25 @@ type Alert = {
   description: string
 }
 
+type NotificationApiRow = {
+  id: number
+  stockItemId: number | null
+  profileId: number | null
+  profileName: string | null
+  medicineName: string
+  kind: 'stock_critical' | 'stock_out' | 'expiry_soon'
+  severity: 'warning' | 'critical'
+  title: string
+  description: string
+  isRead: boolean
+  createdAt: string
+  readAt: string | null
+}
+
+type MarkAllNotificationsResponse = {
+  updatedCount: number
+}
+
 type ChatMessage = {
   id: number
   role: 'user' | 'assistant'
@@ -170,6 +189,7 @@ const navigation = [
   { to: '/inventaire', label: 'Inventaire', shortLabel: 'Inventaire' },
   { to: '/profils', label: 'Profils', shortLabel: 'Profils' },
   { to: '/historique', label: 'Historique', shortLabel: 'Historique' },
+  { to: '/notifications', label: 'Notifications', shortLabel: 'Notif' },
   { to: '/assistant', label: 'Assistant IA', shortLabel: 'Assistant' },
 ]
 
@@ -308,17 +328,74 @@ function mapMovement(row: MovementApiRow): Movement {
   }
 }
 
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString('fr-FR', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function getNotificationKindLabel(kind: NotificationApiRow['kind']) {
+  switch (kind) {
+    case 'stock_out':
+      return 'Rupture'
+    case 'stock_critical':
+      return 'Stock critique'
+    case 'expiry_soon':
+      return 'Peremption'
+    default:
+      return 'Notification'
+  }
+}
+
 function Layout() {
   const location = useLocation()
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0)
+  const [notificationRefreshToken, setNotificationRefreshToken] = useState(0)
   const pageTitleByPath: Record<string, string> = {
     '/': 'Tableau de bord',
     '/inventaire': 'Inventaire',
     '/profils': 'Profils',
     '/historique': 'Historique',
+    '/notifications': 'Notifications',
     '/assistant': 'Assistant IA',
     '/gestion': 'Gestion',
   }
   const pageTitle = pageTitleByPath[location.pathname] ?? 'PharmaStock'
+
+  useEffect(() => {
+    let active = true
+
+    async function loadUnreadNotifications() {
+      try {
+        const notifications = await fetchJson<NotificationApiRow[]>('/api/notifications?status=unread')
+
+        if (active) {
+          setUnreadNotificationsCount(notifications.length)
+        }
+      } catch {
+        if (active) {
+          setUnreadNotificationsCount(0)
+        }
+      }
+    }
+
+    void loadUnreadNotifications()
+    const timerId = window.setInterval(() => {
+      void loadUnreadNotifications()
+    }, 15000)
+
+    return () => {
+      active = false
+      window.clearInterval(timerId)
+    }
+  }, [location.pathname, notificationRefreshToken])
+
+  function handleNotificationsUpdated() {
+    setNotificationRefreshToken((current) => current + 1)
+  }
 
   return (
     <div className="app-shell">
@@ -362,7 +439,13 @@ function Layout() {
             <p className="muted">5 mars 2026</p>
           </div>
           <div className="topbar-actions">
-            <div className="notification-pill">Alertes</div>
+            <NavLink
+              to="/notifications"
+              className={({ isActive }) => (isActive ? 'notification-pill notification-pill-active' : 'notification-pill')}
+            >
+              Notifications
+              {unreadNotificationsCount > 0 ? <span className="notification-count">{unreadNotificationsCount}</span> : null}
+            </NavLink>
           </div>
         </header>
 
@@ -371,6 +454,7 @@ function Layout() {
           <Route path="/inventaire" element={<InventoryPage />} />
           <Route path="/profils" element={<ProfilesPage />} />
           <Route path="/historique" element={<HistoryPage />} />
+          <Route path="/notifications" element={<NotificationsPage onNotificationsUpdated={handleNotificationsUpdated} />} />
           <Route path="/gestion" element={<GestionPage initialTab="inventaire" />} />
           <Route path="/assistant" element={<AssistantPage />} />
         </Routes>
@@ -1441,6 +1525,189 @@ function HistoryPage() {
               </div>
             </div>
           ))}
+        </div>
+      </article>
+    </section>
+  )
+}
+
+function NotificationsPage({ onNotificationsUpdated }: { onNotificationsUpdated: () => void }) {
+  const [notifications, setNotifications] = useState<NotificationApiRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [pendingAction, setPendingAction] = useState<number | 'all' | null>(null)
+
+  async function loadNotifications() {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const rows = await fetchJson<NotificationApiRow[]>('/api/notifications')
+      setNotifications(rows)
+    } catch {
+      setError('Impossible de charger le centre notifications.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadNotifications()
+  }, [])
+
+  async function handleMarkAsRead(notificationId: number) {
+    setPendingAction(notificationId)
+    setError(null)
+
+    try {
+      await fetchJson<NotificationApiRow>(`/api/notifications/${notificationId}/read`, {
+        method: 'PATCH',
+      })
+
+      await loadNotifications()
+      onNotificationsUpdated()
+    } catch {
+      setError('Impossible de marquer cette notification comme lue.')
+    } finally {
+      setPendingAction(null)
+    }
+  }
+
+  async function handleMarkAllAsRead() {
+    setPendingAction('all')
+    setError(null)
+
+    try {
+      await fetchJson<MarkAllNotificationsResponse>('/api/notifications/read-all', {
+        method: 'PATCH',
+      })
+
+      await loadNotifications()
+      onNotificationsUpdated()
+    } catch {
+      setError('Impossible de marquer toutes les notifications comme lues.')
+    } finally {
+      setPendingAction(null)
+    }
+  }
+
+  const unreadNotifications = notifications.filter((notification) => !notification.isRead)
+  const readNotifications = notifications.filter((notification) => notification.isRead)
+
+  return (
+    <section className="page-grid notifications-layout">
+      <article className="card">
+        <div className="section-heading inventory-toolbar">
+          <div>
+            <p className="eyebrow">Centre notifications</p>
+            <h3>Suivi des evenements critiques</h3>
+            <p className="muted">Chaque alerte importante du stock cree une notification persistante et tracable.</p>
+          </div>
+          <div className="button-row">
+            <button className="secondary-button" type="button" onClick={() => void loadNotifications()} disabled={loading || pendingAction !== null}>
+              Rafraichir
+            </button>
+            <button
+              className="primary-button"
+              type="button"
+              onClick={() => void handleMarkAllAsRead()}
+              disabled={unreadNotifications.length === 0 || pendingAction !== null}
+            >
+              {pendingAction === 'all' ? 'Traitement...' : 'Tout marquer comme lu'}
+            </button>
+          </div>
+        </div>
+
+        <div className="stats-grid simple-grid notifications-summary-grid">
+          <article className="card stat-card">
+            <span className="eyebrow">Non lues</span>
+            <strong>{unreadNotifications.length}</strong>
+            <p>Notifications a traiter</p>
+          </article>
+          <article className="card stat-card">
+            <span className="eyebrow">Lues</span>
+            <strong>{readNotifications.length}</strong>
+            <p>Notifications archivees</p>
+          </article>
+        </div>
+
+        {error ? <p className="error-text">{error}</p> : null}
+      </article>
+
+      <article className="card">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">A traiter</p>
+            <h3>Notifications non lues</h3>
+          </div>
+        </div>
+
+        {loading ? <p>Chargement des notifications...</p> : null}
+
+        <div className="stack-list">
+          {unreadNotifications.map((notification) => (
+            <article
+              key={notification.id}
+              className={notification.severity === 'critical' ? 'notification-card notification-critical' : 'notification-card notification-warning'}
+            >
+              <div className="notification-main">
+                <div className="notification-meta">
+                  <span className="pill">{getNotificationKindLabel(notification.kind)}</span>
+                  <span className="muted">{formatDateTime(notification.createdAt)}</span>
+                </div>
+                <strong>{notification.title}</strong>
+                <p>{notification.description}</p>
+                <p className="muted">
+                  {notification.medicineName}
+                  {notification.profileName ? ` - ${notification.profileName}` : ''}
+                </p>
+              </div>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => void handleMarkAsRead(notification.id)}
+                disabled={pendingAction !== null}
+              >
+                {pendingAction === notification.id ? 'Traitement...' : 'Marquer comme lue'}
+              </button>
+            </article>
+          ))}
+
+          {!loading && unreadNotifications.length === 0 ? <p className="muted">Aucune notification non lue.</p> : null}
+        </div>
+      </article>
+
+      <article className="card">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Archive</p>
+            <h3>Notifications lues</h3>
+          </div>
+        </div>
+
+        <div className="stack-list">
+          {readNotifications.map((notification) => (
+            <article
+              key={notification.id}
+              className={notification.severity === 'critical' ? 'notification-card notification-card-read notification-critical' : 'notification-card notification-card-read notification-warning'}
+            >
+              <div className="notification-main">
+                <div className="notification-meta">
+                  <span className="pill">{getNotificationKindLabel(notification.kind)}</span>
+                  <span className="muted">Creee le {formatDateTime(notification.createdAt)}</span>
+                  {notification.readAt ? <span className="muted">Lue le {formatDateTime(notification.readAt)}</span> : null}
+                </div>
+                <strong>{notification.title}</strong>
+                <p>{notification.description}</p>
+                <p className="muted">
+                  {notification.medicineName}
+                  {notification.profileName ? ` - ${notification.profileName}` : ''}
+                </p>
+              </div>
+            </article>
+          ))}
+
+          {!loading && readNotifications.length === 0 ? <p className="muted">Aucune notification lue pour le moment.</p> : null}
         </div>
       </article>
     </section>

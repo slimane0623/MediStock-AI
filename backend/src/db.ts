@@ -94,6 +94,27 @@ export type AlertRow = {
   description: string
 }
 
+export type NotificationKind = 'stock_critical' | 'stock_out' | 'expiry_soon'
+
+export type NotificationRow = {
+  id: number
+  stockItemId: number | null
+  profileId: number | null
+  profileName: string | null
+  medicineName: string
+  kind: NotificationKind
+  severity: 'critical' | 'warning'
+  title: string
+  description: string
+  isRead: boolean
+  createdAt: string
+  readAt: string | null
+}
+
+export type NotificationFilters = {
+  status?: 'read' | 'unread'
+}
+
 const dataDir = path.join(process.cwd(), 'data')
 const dbPath = path.join(dataDir, 'medistock.db')
 
@@ -143,6 +164,23 @@ db.exec(`
     quantity_delta INTEGER NOT NULL,
     note TEXT NOT NULL DEFAULT '',
     occurred_at TEXT NOT NULL,
+    FOREIGN KEY (stock_item_id) REFERENCES stock_items (id),
+    FOREIGN KEY (profile_id) REFERENCES profiles (id)
+  );
+
+  CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY,
+    stock_item_id INTEGER,
+    profile_id INTEGER,
+    medicine_name TEXT NOT NULL,
+    profile_name TEXT,
+    kind TEXT NOT NULL,
+    severity TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    is_read INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    read_at TEXT,
     FOREIGN KEY (stock_item_id) REFERENCES stock_items (id),
     FOREIGN KEY (profile_id) REFERENCES profiles (id)
   );
@@ -207,6 +245,89 @@ export function getInventoryStatus(item: Pick<InventoryRow, 'quantity' | 'critic
   }
 
   return 'ok'
+}
+
+function getAlertDescriptor(item: InventoryRow): { kind: NotificationKind, alert: AlertRow } | null {
+  const status = getInventoryStatus(item)
+
+  if (status === 'critical') {
+    return {
+      kind: 'stock_critical',
+      alert: {
+        id: item.id,
+        severity: 'warning',
+        title: `${item.medicineName} bientot critique`,
+        description: `${item.quantity} ${item.unit} restants pour ${item.profileName ?? 'le foyer'}`,
+      },
+    }
+  }
+
+  if (status === 'expiring') {
+    return {
+      kind: 'expiry_soon',
+      alert: {
+        id: item.id,
+        severity: 'warning',
+        title: `${item.medicineName} proche peremption`,
+        description: `Date de peremption: ${item.expiryDate}`,
+      },
+    }
+  }
+
+  if (status === 'out') {
+    return {
+      kind: 'stock_out',
+      alert: {
+        id: item.id,
+        severity: 'critical',
+        title: `${item.medicineName} en rupture`,
+        description: `Aucun stock disponible pour ${item.profileName ?? 'le foyer'}`,
+      },
+    }
+  }
+
+  return null
+}
+
+function createNotificationForInventoryItem(item: InventoryRow, previousStatus?: InventoryStatus) {
+  const nextStatus = getInventoryStatus(item)
+
+  if (nextStatus === 'ok' || nextStatus === previousStatus) {
+    return
+  }
+
+  const descriptor = getAlertDescriptor(item)
+
+  if (!descriptor) {
+    return
+  }
+
+  db.prepare(`
+    INSERT INTO notifications (
+      stock_item_id,
+      profile_id,
+      medicine_name,
+      profile_name,
+      kind,
+      severity,
+      title,
+      description,
+      is_read,
+      created_at,
+      read_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, NULL)
+  `).run(
+    item.id,
+    item.profileId,
+    item.medicineName,
+    item.profileName,
+    descriptor.kind,
+    descriptor.alert.severity,
+    descriptor.alert.title,
+    descriptor.alert.description,
+    new Date().toISOString(),
+  )
 }
 
 export function listProfiles() {
@@ -421,6 +542,8 @@ export function applyInventoryAction(input: InventoryActionInput): InventoryActi
       return { ok: false, code: 'NOT_FOUND' }
     }
 
+    createNotificationForInventoryItem(item)
+
     return { ok: true, item, movement }
   } catch {
     db.exec('ROLLBACK')
@@ -459,10 +582,18 @@ export function createInventory(input: InventoryMutationInput) {
     input.notes,
   )
 
-  return getInventoryById(Number(stockResult.lastInsertRowid)) ?? null
+  const created = getInventoryById(Number(stockResult.lastInsertRowid)) ?? null
+
+  if (created) {
+    createNotificationForInventoryItem(created)
+  }
+
+  return created
 }
 
 export function updateInventory(id: number, input: InventoryMutationInput) {
+  const previousItem = getInventoryById(id)
+  const previousStatus = previousItem ? getInventoryStatus(previousItem) : undefined
   const existing = db.prepare(`
     SELECT medicine_id AS medicineId
     FROM stock_items
@@ -501,7 +632,13 @@ export function updateInventory(id: number, input: InventoryMutationInput) {
     id,
   )
 
-  return getInventoryById(id) ?? null
+  const updated = getInventoryById(id) ?? null
+
+  if (updated) {
+    createNotificationForInventoryItem(updated, previousStatus)
+  }
+
+  return updated
 }
 
 export function deleteInventory(id: number) {
@@ -560,37 +697,108 @@ export function listMovements(filters: MovementFilters = {}) {
   `).all(...params) as MovementRow[]
 }
 
+function getNotificationById(notificationId: number) {
+  const row = db.prepare(`
+    SELECT
+      id,
+      stock_item_id AS stockItemId,
+      profile_id AS profileId,
+      profile_name AS profileName,
+      medicine_name AS medicineName,
+      kind,
+      severity,
+      title,
+      description,
+      is_read AS isRead,
+      created_at AS createdAt,
+      read_at AS readAt
+    FROM notifications
+    WHERE id = ?
+  `).get(notificationId) as (Omit<NotificationRow, 'isRead'> & { isRead: number }) | undefined
+
+  if (!row) {
+    return null
+  }
+
+  return {
+    ...row,
+    isRead: row.isRead === 1,
+  }
+}
+
+export function listNotifications(filters: NotificationFilters = {}) {
+  const conditions: string[] = []
+  const params: Array<number | string> = []
+
+  if (filters.status === 'read') {
+    conditions.push('is_read = 1')
+  }
+
+  if (filters.status === 'unread') {
+    conditions.push('is_read = 0')
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+
+  const rows = db.prepare(`
+    SELECT
+      id,
+      stock_item_id AS stockItemId,
+      profile_id AS profileId,
+      profile_name AS profileName,
+      medicine_name AS medicineName,
+      kind,
+      severity,
+      title,
+      description,
+      is_read AS isRead,
+      created_at AS createdAt,
+      read_at AS readAt
+    FROM notifications
+    ${whereClause}
+    ORDER BY is_read ASC, created_at DESC
+  `).all(...params) as Array<Omit<NotificationRow, 'isRead'> & { isRead: number }>
+
+  return rows.map((row) => ({
+    ...row,
+    isRead: row.isRead === 1,
+  }))
+}
+
+export function markNotificationAsRead(id: number) {
+  const readAt = new Date().toISOString()
+  const result = db.prepare(`
+    UPDATE notifications
+    SET is_read = 1, read_at = COALESCE(read_at, ?)
+    WHERE id = ?
+  `).run(readAt, id)
+
+  if (result.changes === 0) {
+    return null
+  }
+
+  return getNotificationById(id)
+}
+
+export function markAllNotificationsAsRead() {
+  const readAt = new Date().toISOString()
+  const result = db.prepare(`
+    UPDATE notifications
+    SET is_read = 1, read_at = COALESCE(read_at, ?)
+    WHERE is_read = 0
+  `).run(readAt)
+
+  return { updatedCount: result.changes }
+}
+
 export function listAlerts() {
   const inventory = listInventory()
 
   const alerts = inventory.flatMap<AlertRow>((item) => {
-    const status = getInventoryStatus(item)
+    const descriptor = getAlertDescriptor(item)
 
-    if (status === 'critical') {
-      return [{
-        id: item.id,
-        severity: 'warning',
-        title: `${item.medicineName} bientot critique`,
-        description: `${item.quantity} ${item.unit} restants pour ${item.profileName ?? 'le foyer'}`,
-      }]
-    }
-
-    if (status === 'expiring') {
-      return [{
-        id: item.id,
-        severity: 'warning',
-        title: `${item.medicineName} proche peremption`,
-        description: `Date de peremption: ${item.expiryDate}`,
-      }]
-    }
-
-    if (status === 'out') {
-      return [{
-        id: item.id,
-        severity: 'critical',
-        title: `${item.medicineName} en rupture`,
-        description: `Aucun stock disponible pour ${item.profileName ?? 'le foyer'}`,
-      }]
+    if (descriptor) {
+      return [descriptor.alert]
     }
 
     return []
@@ -635,3 +843,17 @@ export function getDashboard() {
     totalMovementsThisMonth: monthlyMovements.length,
   }
 }
+
+function backfillNotificationsIfEmpty() {
+  const count = db.prepare('SELECT COUNT(*) AS count FROM notifications').get() as { count: number }
+
+  if (count.count > 0) {
+    return
+  }
+
+  for (const item of listInventory()) {
+    createNotificationForInventoryItem(item)
+  }
+}
+
+backfillNotificationsIfEmpty()

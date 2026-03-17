@@ -41,9 +41,9 @@ export type LocalChatReply = {
 }
 
 export class ChatServiceError extends Error {
-  code: 'TIMEOUT' | 'MODEL_UNAVAILABLE' | 'INTERNAL_ERROR'
+  code: 'TIMEOUT' | 'MODEL_UNAVAILABLE' | 'RESOURCE_EXHAUSTED' | 'INTERNAL_ERROR'
 
-  constructor(code: 'TIMEOUT' | 'MODEL_UNAVAILABLE' | 'INTERNAL_ERROR', message: string) {
+  constructor(code: 'TIMEOUT' | 'MODEL_UNAVAILABLE' | 'RESOURCE_EXHAUSTED' | 'INTERNAL_ERROR', message: string) {
     super(message)
     this.name = 'ChatServiceError'
     this.code = code
@@ -59,7 +59,7 @@ const fallbackDisclaimer = 'Assistant local informatif uniquement. Ne remplace p
 const chatDisclaimer = process.env.CHAT_DISCLAIMER?.trim() || fallbackDisclaimer
 const ollamaKeepAlive = process.env.OLLAMA_KEEP_ALIVE?.trim() || '30m'
 
-export const chatTimeoutMs = parsePositiveInt(process.env.CHAT_TIMEOUT_MS, 30000)
+export const chatTimeoutMs = parsePositiveInt(process.env.CHAT_TIMEOUT_MS, 15000)
 const chatMaxTokens = parsePositiveInt(process.env.CHAT_MAX_TOKENS, 120)
 
 function parsePositiveInt(value: string | undefined, fallback: number) {
@@ -79,6 +79,15 @@ function normalizeBaseUrl(value: string | undefined, fallback: string) {
 
 function getProviderBaseUrl(provider: ChatProvider) {
   return provider === 'ollama' ? ollamaBaseUrl : llamaCppBaseUrl
+}
+
+function isMemoryPressureErrorMessage(message: string) {
+  const normalized = message.toLowerCase()
+
+  return normalized.includes('requires more system memory')
+    || normalized.includes('not enough memory')
+    || normalized.includes('insufficient memory')
+    || normalized.includes('out of memory')
 }
 
 function getSystemPrompt() {
@@ -106,18 +115,33 @@ async function requestJson<T>(url: string, init: RequestInit, timeoutMs: number)
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
   try {
+    const requestHeaders = init.headers
+      ? {
+          'Content-Type': 'application/json',
+          ...init.headers,
+        }
+      : {
+          'Content-Type': 'application/json',
+        }
+
     const response = await fetch(url, {
       ...init,
       signal: controller.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(init.headers ?? {}),
-      },
+      headers: requestHeaders,
     })
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => '')
-      throw new ChatServiceError('INTERNAL_ERROR', `HTTP ${response.status}${errorText ? ` - ${errorText.slice(0, 180)}` : ''}`)
+
+      if (response.status === 500 && isMemoryPressureErrorMessage(errorText)) {
+        throw new ChatServiceError(
+          'RESOURCE_EXHAUSTED',
+          'Memoire insuffisante pour ce modele local. Installe un modele plus leger (ex: "ollama pull llama3.2:1b") puis definis CHAT_MODEL=llama3.2:1b.',
+        )
+      }
+
+      const errorSnippet = errorText ? ` - ${errorText.slice(0, 180)}` : ''
+      throw new ChatServiceError('INTERNAL_ERROR', `HTTP ${response.status}${errorSnippet}`)
     }
 
     return response.json() as Promise<T>
