@@ -36,10 +36,16 @@ Créez `backend/.env` (ou utilisez les variables d environnement de votre shell)
 CHAT_PROVIDER=ollama
 CHAT_MODEL=llama3.2:3b
 CHAT_TIMEOUT_MS=12000
+CHAT_MAX_CONCURRENT=2
+CHAT_STATUS_CACHE_TTL_MS=5000
 OLLAMA_BASE_URL=http://127.0.0.1:11434
 LLAMA_CPP_BASE_URL=http://127.0.0.1:8080
 CHAT_DISCLAIMER=Assistant local informatif uniquement. Ne remplace pas un avis medical professionnel.
 ```
+
+Parametres Sprint 6 (stabilite locale):
+- `CHAT_MAX_CONCURRENT`: limite de requetes IA simultanees pour eviter l epuisement memoire CPU.
+- `CHAT_STATUS_CACHE_TTL_MS`: cache temporaire du statut modele pour reduire les appels repetes `/api/tags` ou `/v1/models`.
 
 Exemple Ollama :
 ```powershell
@@ -179,6 +185,79 @@ Retourne : réponse générée localement + disclaimer de sécurité
 
 ---
 
+## 🧪 Recette Sprint 6 (repro steps + cas limites)
+
+Objectif:
+- Valider la stabilite front/back en conditions reelles.
+- Reproduire rapidement les cas limites critiques.
+
+### Parcours de reproduction (Front)
+
+1. Ouvrir `http://127.0.0.1:5173`.
+2. Verifier navigation desktop:
+  - Dashboard -> Inventaire -> Profils -> Historique -> Notifications -> Assistant.
+3. Verifier recherche globale:
+  - Saisir une requete dans la barre superieure.
+  - Verifier 3 sections de resultats (Inventaire, Profils, Historique).
+  - Appliquer les filtres (categorie, statut inventaire, type mouvement).
+4. Verifier parcours mobile:
+  - Ouvrir les DevTools navigateur et simuler 375x812, 390x844 et 768x1024.
+  - Verifier presence de la bottom nav et absence de chevauchement des formulaires/modales.
+5. Verifier operations metier:
+  - Ajouter/modifier/supprimer un medicament.
+  - Enregistrer une prise puis un ajout de stock.
+  - Verifier impact dans Historique et Dashboard.
+
+### Cas limites a tester
+
+1. Recherche vide:
+  - Vider le champ de recherche globale.
+  - Resultat attendu: panneau de resultats ferme, aucune erreur UI.
+2. Filtre sans resultat:
+  - Requete + filtre strict (ex: categorie Profil + mot inexistant).
+  - Resultat attendu: sections avec "Aucun resultat" sans crash.
+3. Backend indisponible:
+  - Arreter le backend puis rafraichir le front.
+  - Resultat attendu: messages d erreur explicites, UI reste utilisable.
+4. Charge IA concurrente:
+  - Envoyer plusieurs requetes chat simultanees.
+  - Resultat attendu: certaines reponses peuvent retourner `503 RESOURCE_EXHAUSTED`, sans blocage serveur.
+5. Modele IA absent:
+  - Arreter Ollama/llama.cpp puis appeler `/api/chat/status`.
+  - Resultat attendu: `available=false` + raison detaillee.
+
+---
+
+## ⚡ Test de charge local (Sprint 6)
+
+Depuis `backend/`:
+
+```powershell
+npm run test:load:api
+```
+
+Test de charge API + chat local:
+
+```powershell
+npm run test:load:chat
+```
+
+Note: le script chat utilise un timeout client de 20s pour couvrir `CHAT_TIMEOUT_MS` (15s par defaut) et eviter les faux-negatifs de test.
+
+Personnalisation:
+
+```powershell
+node scripts/load-endpoints.mjs --duration=30 --concurrency=25 --timeout=8000 --base-url=http://localhost:4000
+node scripts/load-endpoints.mjs --duration=30 --concurrency=8 --include-chat
+```
+
+Critere de validation Sprint 6:
+- 0 timeout reseau.
+- 0 erreur transport.
+- Endpoint reste joignable sous charge locale.
+
+---
+
 ## 🗄️ Base de Données
 
 **Localisation :** `backend/data/medistock.db` (SQLite local)
@@ -250,11 +329,13 @@ PHARMACIE/
 │
 ├── backend/                     # Node.js + Express
 │   ├── src/
-│   │   ├── server.ts           # API REST (6 endpoints)
+│   │   ├── server.ts           # API REST (8 endpoints)
 │   │   └── db.ts               # SQLite + seed data
 │   ├── data/
 │   │   └── medistock.db        # Base de données SQLite
-│   └── package.json            # Scripts: dev, build, start
+│   ├── scripts/
+│   │   └── load-endpoints.mjs  # Test de charge local
+│   └── package.json            # Scripts: dev, build, start, test:load*
 │
 └── SETUP.md                     # Ce fichier
 ```
@@ -263,9 +344,9 @@ PHARMACIE/
 
 ## 🚀 Prochaines Étapes
 
-1. **Connecter Frontend → Backend** (remplacer mock data)
-2. **Ajouter CRUD endpoints** (POST/PUT/DELETE)
-3. **Intégration Ollama** (Chat IA local en Sprint 3)
+1. Ajouter tests automatises (integration API + e2e front) pour remplacer la recette manuelle.
+2. Ajouter pipeline CI pour executer `npm run build` et `npm run test:load:api` sur environnement local dedie.
+3. Affiner la performance bundle frontend (code splitting) pour reduire le poids JS.
 
 ---
 
@@ -279,5 +360,5 @@ En cas de problème :
 
 ---
 
-**Dernière mise à jour :** 11 mars 2026  
-**Version :** 1.0 du projet MediStock AI
+**Dernière mise à jour :** 17 mars 2026  
+**Version :** 1.1 du projet MediStock AI

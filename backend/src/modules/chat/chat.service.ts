@@ -40,6 +40,12 @@ export type LocalChatReply = {
   model: string
 }
 
+export type ChatRuntimeMetrics = {
+  inFlightRequests: number
+  maxConcurrent: number
+  statusCacheTtlMs: number
+}
+
 export class ChatServiceError extends Error {
   code: 'TIMEOUT' | 'MODEL_UNAVAILABLE' | 'RESOURCE_EXHAUSTED' | 'INTERNAL_ERROR'
 
@@ -60,12 +66,28 @@ const chatDisclaimer = process.env.CHAT_DISCLAIMER?.trim() || fallbackDisclaimer
 const ollamaKeepAlive = process.env.OLLAMA_KEEP_ALIVE?.trim() || '30m'
 
 export const chatTimeoutMs = parsePositiveInt(process.env.CHAT_TIMEOUT_MS, 15000)
+export const chatStatusCacheTtlMs = parseNonNegativeInt(process.env.CHAT_STATUS_CACHE_TTL_MS, 5000)
+export const chatMaxConcurrent = parsePositiveInt(process.env.CHAT_MAX_CONCURRENT, 2)
 const chatMaxTokens = parsePositiveInt(process.env.CHAT_MAX_TOKENS, 120)
+
+let inFlightChatRequests = 0
+let cachedStatus: { value: LocalModelStatus, expiresAt: number } | null = null
+let statusLookupPromise: Promise<LocalModelStatus> | null = null
 
 function parsePositiveInt(value: string | undefined, fallback: number) {
   const parsed = Number(value)
 
   if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback
+  }
+
+  return Math.floor(parsed)
+}
+
+function parseNonNegativeInt(value: string | undefined, fallback: number) {
+  const parsed = Number(value)
+
+  if (!Number.isFinite(parsed) || parsed < 0) {
     return fallback
   }
 
@@ -261,11 +283,57 @@ async function resolveLlamaCppStatus(): Promise<LocalModelStatus> {
 }
 
 export async function getLocalModelStatus() {
-  if (chatProvider === 'llama_cpp') {
-    return resolveLlamaCppStatus()
+  const now = Date.now()
+
+  if (chatStatusCacheTtlMs > 0 && cachedStatus && now < cachedStatus.expiresAt) {
+    return cachedStatus.value
   }
 
-  return resolveOllamaStatus()
+  if (statusLookupPromise) {
+    return statusLookupPromise
+  }
+
+  statusLookupPromise = (async () => {
+    const status = chatProvider === 'llama_cpp'
+      ? await resolveLlamaCppStatus()
+      : await resolveOllamaStatus()
+
+    if (chatStatusCacheTtlMs > 0) {
+      cachedStatus = {
+        value: status,
+        expiresAt: Date.now() + chatStatusCacheTtlMs,
+      }
+    }
+
+    return status
+  })()
+
+  try {
+    return await statusLookupPromise
+  } finally {
+    statusLookupPromise = null
+  }
+}
+
+export function getChatRuntimeMetrics(): ChatRuntimeMetrics {
+  return {
+    inFlightRequests: inFlightChatRequests,
+    maxConcurrent: chatMaxConcurrent,
+    statusCacheTtlMs: chatStatusCacheTtlMs,
+  }
+}
+
+function acquireChatSlot() {
+  if (inFlightChatRequests >= chatMaxConcurrent) {
+    return false
+  }
+
+  inFlightChatRequests += 1
+  return true
+}
+
+function releaseChatSlot() {
+  inFlightChatRequests = Math.max(0, inFlightChatRequests - 1)
 }
 
 async function generateWithOllama(model: string, message: string, history: ChatHistoryTurn[] | undefined) {
@@ -321,20 +389,31 @@ async function generateWithLlamaCpp(model: string, message: string, history: Cha
 }
 
 export async function generateLocalChatReply(input: { message: string, history?: ChatHistoryTurn[] }): Promise<LocalChatReply> {
-  const status = await getLocalModelStatus()
-
-  if (!status.available) {
-    throw new ChatServiceError('MODEL_UNAVAILABLE', status.reason ?? 'Le modele local est indisponible.')
+  if (!acquireChatSlot()) {
+    throw new ChatServiceError(
+      'RESOURCE_EXHAUSTED',
+      `Trop de requetes IA simultanees. Reessaie dans quelques secondes (max concurrent: ${chatMaxConcurrent}).`,
+    )
   }
 
-  const reply = status.provider === 'ollama'
-    ? await generateWithOllama(status.model, input.message, input.history)
-    : await generateWithLlamaCpp(status.model, input.message, input.history)
+  try {
+    const status = await getLocalModelStatus()
 
-  return {
-    reply,
-    disclaimer: chatDisclaimer,
-    provider: status.provider,
-    model: status.model,
+    if (!status.available) {
+      throw new ChatServiceError('MODEL_UNAVAILABLE', status.reason ?? 'Le modele local est indisponible.')
+    }
+
+    const reply = status.provider === 'ollama'
+      ? await generateWithOllama(status.model, input.message, input.history)
+      : await generateWithLlamaCpp(status.model, input.message, input.history)
+
+    return {
+      reply,
+      disclaimer: chatDisclaimer,
+      provider: status.provider,
+      model: status.model,
+    }
+  } finally {
+    releaseChatSlot()
   }
 }

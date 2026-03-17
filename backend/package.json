@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "test:load": "node scripts/load-endpoints.mjs",
+    "test:load:api": "node scripts/load-endpoints.mjs --duration=20 --concurrency=20",
+    "test:load:chat": "node scripts/load-endpoints.mjs --duration=20 --concurrency=6 --timeout=20000 --include-chat"
   },
   "keywords": [],
   "author": "",

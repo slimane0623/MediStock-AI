@@ -271,3 +271,21 @@ Template de branche:
 - ST-06 Requete langage naturel IA: interpretation et reponse utilisateur
 - ST-07 Hors-ligne: donnees locales accessibles sans perte
 - ST-08 Responsive: sidebar -> bottom nav, pas de chevauchement
+
+---
+
+## 9) Realisation Sprint 6 (Slim - qualite back + doc)
+
+Livrables implementes:
+- Front (support recette): procedure de repro + cas limites ajoutes dans `SETUP.md` (section "Recette Sprint 6").
+- Back (optimisation endpoint IA):
+  - limite de requetes IA simultanees (`CHAT_MAX_CONCURRENT`)
+  - cache TTL du statut modele (`CHAT_STATUS_CACHE_TTL_MS`)
+  - metadata runtime exposees par `/api/chat/status` et `/api/chat`
+- Documentation technique runnable:
+  - scripts de charge locale `npm run test:load:api` et `npm run test:load:chat`
+  - script `backend/scripts/load-endpoints.mjs`
+
+Definition of done couverte:
+- Documentation runnable: oui (commandes et procedure explicites dans `SETUP.md`).
+- Endpoints stables en test charge local: oui (validation par script de charge local, seuils de stabilite documentes).

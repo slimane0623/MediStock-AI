@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { z } from 'zod'
-import { ChatServiceError, chatTimeoutMs, generateLocalChatReply, getLocalModelStatus } from './chat.service.js'
+import { ChatServiceError, chatTimeoutMs, generateLocalChatReply, getChatRuntimeMetrics, getLocalModelStatus } from './chat.service.js'
 
 export const chatRouter = Router()
 
@@ -25,6 +25,11 @@ const chatStatusResponseSchema = z.object({
   reason: z.string().nullable(),
   checkedAt: z.string().min(1),
   timeoutMs: z.number().int().positive(),
+  runtime: z.object({
+    inFlightRequests: z.number().int().nonnegative(),
+    maxConcurrent: z.number().int().positive(),
+    statusCacheTtlMs: z.number().int().nonnegative(),
+  }),
 })
 
 const chatMetaSuccessSchema = z.object({
@@ -32,6 +37,10 @@ const chatMetaSuccessSchema = z.object({
   model: z.string().min(1),
   latencyMs: z.number().int().nonnegative(),
   timeoutMs: z.number().int().positive(),
+  runtime: z.object({
+    inFlightRequests: z.number().int().nonnegative(),
+    maxConcurrent: z.number().int().positive(),
+  }),
 })
 
 const chatSuccessResponseSchema = z.object({
@@ -47,6 +56,10 @@ const chatMetaFailureSchema = z.object({
   model: z.string().nullable(),
   latencyMs: z.number().int().nonnegative(),
   timeoutMs: z.number().int().positive(),
+  runtime: z.object({
+    inFlightRequests: z.number().int().nonnegative(),
+    maxConcurrent: z.number().int().positive(),
+  }),
 })
 
 const chatFailureResponseSchema = z.object({
@@ -61,10 +74,12 @@ const chatFailureResponseSchema = z.object({
 
 chatRouter.get('/status', async (_request, response) => {
   const status = await getLocalModelStatus()
+  const runtime = getChatRuntimeMetrics()
 
   const payload = chatStatusResponseSchema.parse({
     ok: true,
     ...status,
+    runtime,
   })
 
   response.json(payload)
@@ -74,6 +89,8 @@ chatRouter.post('/', async (request, response) => {
   const parsed = chatRequestSchema.safeParse(request.body)
 
   if (!parsed.success) {
+    const runtime = getChatRuntimeMetrics()
+
     const payload = chatFailureResponseSchema.parse({
       ok: false,
       requestId: null,
@@ -86,6 +103,10 @@ chatRouter.post('/', async (request, response) => {
         model: null,
         latencyMs: 0,
         timeoutMs: chatTimeoutMs,
+        runtime: {
+          inFlightRequests: runtime.inFlightRequests,
+          maxConcurrent: runtime.maxConcurrent,
+        },
       },
     })
 
@@ -100,6 +121,7 @@ chatRouter.post('/', async (request, response) => {
       message: parsed.data.message,
       history: parsed.data.history,
     })
+    const runtime = getChatRuntimeMetrics()
 
     const payload = chatSuccessResponseSchema.parse({
       ok: true,
@@ -111,6 +133,10 @@ chatRouter.post('/', async (request, response) => {
         model: reply.model,
         latencyMs: Date.now() - startedAt,
         timeoutMs: chatTimeoutMs,
+        runtime: {
+          inFlightRequests: runtime.inFlightRequests,
+          maxConcurrent: runtime.maxConcurrent,
+        },
       },
     })
 
@@ -129,6 +155,7 @@ chatRouter.post('/', async (request, response) => {
     const message = isChatError
       ? error.message
       : 'Erreur interne du service de chat local.'
+    const runtime = getChatRuntimeMetrics()
 
     const payload = chatFailureResponseSchema.parse({
       ok: false,
@@ -142,6 +169,10 @@ chatRouter.post('/', async (request, response) => {
         model: null,
         latencyMs: Date.now() - startedAt,
         timeoutMs: chatTimeoutMs,
+        runtime: {
+          inFlightRequests: runtime.inFlightRequests,
+          maxConcurrent: runtime.maxConcurrent,
+        },
       },
     })
 
