@@ -35,8 +35,9 @@ Créez `backend/.env` (ou utilisez les variables d environnement de votre shell)
 ```env
 CHAT_PROVIDER=ollama
 CHAT_MODEL=llama3.2:3b
-CHAT_TIMEOUT_MS=12000
-CHAT_MAX_CONCURRENT=2
+CHAT_TIMEOUT_MS=45000
+CHAT_MAX_CONCURRENT=1
+CHAT_MAX_TOKENS=600
 CHAT_STATUS_CACHE_TTL_MS=5000
 OLLAMA_BASE_URL=http://127.0.0.1:11434
 LLAMA_CPP_BASE_URL=http://127.0.0.1:8080
@@ -60,6 +61,13 @@ Exemple llama.cpp (OpenAI-compatible server) :
 $env:CHAT_PROVIDER="llama_cpp"
 ```
 
+Changer de modele dans PowerShell (session courante) :
+```powershell
+$env:CHAT_MODEL="llama3.2:1b"
+# ou
+$env:CHAT_MODEL="llama2-uncensored:latest"
+```
+
 ### Frontend :
 ```powershell
 cd ../frontend
@@ -72,6 +80,35 @@ npm install
 ls backend/node_modules   # Doit exister
 ls frontend/node_modules  # Doit exister
 ```
+
+---
+
+## 🤖 Démarrage d'Ollama
+
+### Option 1 : Première utilisation (télécharger le modèle)
+
+**Terminal Ollama :**
+```powershell
+# Télécharger le modèle llama3.2:3b (~2GB, quelques minutes)
+ollama pull llama3.2:3b
+
+# Démarrer le serveur Ollama
+ollama serve
+```
+
+Vous verrez :
+```
+time=... level=INFO msg="Listening on 127.0.0.1:11434"
+```
+
+### Option 2 : Ollama déjà installé (sessions futures)
+
+**Terminal Ollama :**
+```powershell
+ollama serve
+```
+
+⚠️ **Important :** Ollama doit rester actif dans un terminal pendant que vous utilisez le chat local.
 
 ---
 
@@ -278,6 +315,19 @@ rm backend/data/medistock.db
 ---
 
 ## 🐛 Troubleshooting
+
+### ❌ Erreur Ollama : "Port 11434 déjà utilisé"
+```powershell
+# Trouver le processus Ollama qui tourne
+Get-Process | Where-Object {$_.ProcessName -like "*ollama*"}
+
+# Ou tuer directement avec le port
+netstat -ano | findstr :11434
+taskkill /PID <PID> /F
+
+# Puis relancer
+ollama serve
+```
 
 ### ❌ Erreur : "Port 4000 déjà utilisé"
 ```powershell

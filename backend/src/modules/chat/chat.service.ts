@@ -1,8 +1,18 @@
+import { listInventory, InventoryRow, listProfiles, ProfileRow, listAlerts, AlertRow, listMovements, MovementRow, getDashboard, DashboardStats, listNotifications, NotificationRow } from '../../db.js'
+
 type ChatRole = 'user' | 'assistant'
 
 export type ChatHistoryTurn = {
   role: ChatRole
   content: string
+}
+
+// Types for categorized inventory
+type CategorizedInventory = {
+  critical: InventoryRow[]
+  expiring: InventoryRow[]
+  outOfStock: InventoryRow[]
+  normal: InventoryRow[]
 }
 
 type ChatProvider = 'ollama' | 'llama_cpp'
@@ -65,10 +75,10 @@ const fallbackDisclaimer = 'Assistant local informatif uniquement. Ne remplace p
 const chatDisclaimer = process.env.CHAT_DISCLAIMER?.trim() || fallbackDisclaimer
 const ollamaKeepAlive = process.env.OLLAMA_KEEP_ALIVE?.trim() || '30m'
 
-export const chatTimeoutMs = parsePositiveInt(process.env.CHAT_TIMEOUT_MS, 15000)
+export const chatTimeoutMs = parsePositiveInt(process.env.CHAT_TIMEOUT_MS, 45000)
 export const chatStatusCacheTtlMs = parseNonNegativeInt(process.env.CHAT_STATUS_CACHE_TTL_MS, 5000)
-export const chatMaxConcurrent = parsePositiveInt(process.env.CHAT_MAX_CONCURRENT, 2)
-const chatMaxTokens = parsePositiveInt(process.env.CHAT_MAX_TOKENS, 120)
+export const chatMaxConcurrent = parsePositiveInt(process.env.CHAT_MAX_CONCURRENT, 1)
+const chatMaxTokens = parsePositiveInt(process.env.CHAT_MAX_TOKENS, 600)
 
 let inFlightChatRequests = 0
 let cachedStatus: { value: LocalModelStatus, expiresAt: number } | null = null
@@ -112,24 +122,502 @@ function isMemoryPressureErrorMessage(message: string) {
     || normalized.includes('out of memory')
 }
 
-function getSystemPrompt() {
-  return [
-    'Tu es l assistant local de MediStock AI.',
-    'Tu aides sur le stock, les alertes, les profils, les prises et le renouvellement.',
-    'Ne donne jamais de diagnostic medical et ne remplace pas un professionnel de sante.',
-    'Si la question est medicale sensible, encourage l utilisateur a consulter un pharmacien ou medecin.',
-    'Reponds en francais, de facon concise et actionable.',
-  ].join(' ')
+function categorizeInventory(items: InventoryRow[]): CategorizedInventory {
+  const categorized: CategorizedInventory = {
+    critical: [],
+    expiring: [],
+    outOfStock: [],
+    normal: [],
+  }
+
+  const now = new Date()
+  const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+
+  items.forEach((item) => {
+    const expiryDate = new Date(item.expiryDate)
+    
+    if (item.quantity === 0) {
+      categorized.outOfStock.push(item)
+    } else if (item.quantity <= item.criticalThreshold) {
+      categorized.critical.push(item)
+    } else if (expiryDate <= thirtyDaysLater && expiryDate > now) {
+      categorized.expiring.push(item)
+    } else {
+      categorized.normal.push(item)
+    }
+  })
+
+  return categorized
 }
 
-function stringifyHistory(history: ChatHistoryTurn[] | undefined, message: string) {
+function generateSmartInsights(inventory: CategorizedInventory, alerts: AlertRow[], notifications: NotificationRow[]): string {
+  const parts: string[] = []
+
+  if (inventory.critical.length > 0) {
+    parts.push(`🚨 ${inventory.critical.length} CRITIQUE`)
+  }
+  if (inventory.outOfStock.length > 0) {
+    parts.push(`🔴 ${inventory.outOfStock.length} RUPTURE`)
+  }
+  if (inventory.expiring.length > 0) {
+    parts.push(`⏰ ${inventory.expiring.length} EXPIR`)
+  }
+
+  const unread = notifications.filter((n) => !n.isRead).length
+  if (unread > 0) {
+    parts.push(`📢 ${unread} notif`)
+  }
+
+  if (parts.length === 0) {
+    parts.push(`✅ Stock OK`)
+  }
+
+  return parts.join(' | ')
+}
+
+function formatInventoryContext(items: InventoryRow[]): string {
+  if (items.length === 0) {
+    return '📦 Aucun médicament'
+  }
+
+  const categorized = categorizeInventory(items)
+
+  // Only show critical/rupture, rest is summary
+  const critical = categorized.critical.slice(0, 3)
+  const rupture = categorized.outOfStock.slice(0, 2)
+
+  const lines: string[] = []
+
+  if (critical.length > 0) {
+    lines.push('🔴 CRITIQUE:')
+    critical.forEach((i) => lines.push(`  ${i.medicineName}: ${i.quantity}/${i.criticalThreshold}`))
+  }
+
+  if (rupture.length > 0) {
+    lines.push('❌ RUPTURE:')
+    rupture.forEach((i) => lines.push(`  ${i.medicineName}`))
+  }
+
+  lines.push(`✅ Normal: ${categorized.normal.length} | 🟡 Expir: ${categorized.expiring.length}`)
+
+  return lines.join('\n')
+}
+
+function formatProfilesContext(profiles: ProfileRow[]): string {
+  if (profiles.length === 0) {
+    return ''
+  }
+
+  const list = profiles.map((p) => {
+    const a = p.allergies ? ` A:${p.allergies.substring(0, 15)}` : ''
+    return `${p.name}(${p.role})${a}`
+  }).join(' | ')
+
+  return `👥 ${list}`
+}
+
+function formatAlertsContext(alerts: AlertRow[]): string {
+  if (alerts.length === 0) {
+    return ''
+  }
+
+  const critical = alerts.filter((a) => a.severity === 'critical').slice(0, 1)
+  const warnings = alerts.filter((a) => a.severity === 'warning').slice(0, 1)
+
+  const parts: string[] = []
+  if (critical.length > 0) {
+    parts.push(`🔴 ${critical[0].title}`)
+  }
+  if (warnings.length > 0) {
+    parts.push(`🟡 ${warnings[0].title}`)
+  }
+
+  return parts.join(' | ')
+}
+
+function formatMovementsContext(movements: MovementRow[]): string {
+  if (movements.length === 0) {
+    return ''
+  }
+
+  const recent = movements.slice(0, 2)
+  const list = recent.map((m) => {
+    const icon = m.type === 'prise' ? '💊' : '➕'
+    const d = m.occurredAt.substring(0, 10)
+    return `${icon} ${m.medicineName} ${d}`
+  }).join(' | ')
+
+  return `📜 ${list}`
+}
+
+function formatStatsContext(stats: DashboardStats): string {
+  return `📊 ${stats.totalMedicines}🩺 | 🔴${stats.criticalCount} | ❌${stats.outOfStockCount} | 🟡${stats.expiringCount}`
+}
+
+type DeterministicIntent =
+  | 'urgent_renewal'
+  | 'next_renewal'
+  | 'stock_status'
+  | 'medicine_lookup'
+  | 'allergies'
+  | 'expiring'
+  | 'history'
+  | 'none'
+
+function normalizeText(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replaceAll(/[\u0300-\u036f]/g, '')
+    .replaceAll(/[^a-z0-9\s]/g, ' ')
+    .replaceAll(/\s+/g, ' ')
+    .trim()
+}
+
+function getDaysUntilExpiry(expiryDate: string): number {
+  const date = new Date(expiryDate)
+  return Math.ceil((date.valueOf() - Date.now()) / (1000 * 60 * 60 * 24))
+}
+
+function detectDeterministicIntent(message: string): DeterministicIntent {
+  const normalizedMessage = normalizeText(message)
+
+  if ([
+    'allergie',
+    'allergies',
+  ].some((keyword) => normalizedMessage.includes(keyword))) {
+    return 'allergies'
+  }
+
+  if ([
+    '10 derniers jours',
+    'historique',
+    'mouvements',
+    'que s est il passe',
+    'qu est ce qui s est passe',
+    'recemment',
+  ].some((keyword) => normalizedMessage.includes(keyword))) {
+    return 'history'
+  }
+
+  if ([
+    'expire',
+    'expiration',
+    'peremption',
+    'perime',
+  ].some((keyword) => normalizedMessage.includes(keyword))) {
+    return 'expiring'
+  }
+
+  if ([
+    'prochain renouvel',
+    'prochaine renouvel',
+    'prochain reappro',
+    'prochaine commande',
+  ].some((keyword) => normalizedMessage.includes(keyword))) {
+    return 'next_renewal'
+  }
+
+  if ([
+    'stock faible',
+    'etat du stock',
+    'etat stock',
+    'niveau de stock',
+    'rupture',
+  ].some((keyword) => normalizedMessage.includes(keyword))) {
+    return 'stock_status'
+  }
+
+  if ([
+    'renouvel',
+    'urgence',
+    'urgent',
+    'reappro',
+    'reapprovision',
+  ].some((keyword) => normalizedMessage.includes(keyword))) {
+    return 'urgent_renewal'
+  }
+
+  if ([
+    'est ce que',
+    'y a',
+    'dans mon stock',
+    'quantite',
+    'combien',
+    'disponible',
+    'en stock',
+  ].some((keyword) => normalizedMessage.includes(keyword))) {
+    return 'medicine_lookup'
+  }
+
+  return 'none'
+}
+
+function formatItemStatus(item: InventoryRow): string {
+  if (item.quantity === 0) {
+    return 'RUPTURE'
+  }
+
+  if (item.quantity <= item.criticalThreshold) {
+    return 'CRITIQUE'
+  }
+
+  const daysLeft = getDaysUntilExpiry(item.expiryDate)
+  if (daysLeft <= 30) {
+    return `EXPIRE_BIENTOT (${Math.max(daysLeft, 0)}j)`
+  }
+
+  return 'OK'
+}
+
+function buildStockStatusReply(items: InventoryRow[]): string {
+  const categorized = categorizeInventory(items)
+  const total = items.length
+
+  const criticalNames = categorized.critical.slice(0, 4).map((item) => item.medicineName).join(', ')
+  const ruptureNames = categorized.outOfStock.slice(0, 4).map((item) => item.medicineName).join(', ')
+
+  const lines = [
+    `Etat actuel du stock (${total} medicaments):`,
+    `- Rupture: ${categorized.outOfStock.length}`,
+    `- Critique: ${categorized.critical.length}`,
+    `- Expiration <30j: ${categorized.expiring.length}`,
+    `- Normal: ${categorized.normal.length}`,
+  ]
+
+  if (ruptureNames) {
+    lines.push(`- En rupture: ${ruptureNames}`)
+  }
+
+  if (criticalNames) {
+    lines.push(`- Faible stock: ${criticalNames}`)
+  }
+
+  lines.push('Action: prioriser les ruptures puis les niveaux critiques.')
+  return lines.join('\n')
+}
+
+function buildUrgentRenewalReply(items: InventoryRow[]): string {
+  const categorized = categorizeInventory(items)
+  const urgent = [...categorized.outOfStock, ...categorized.critical, ...categorized.expiring]
+
+  if (urgent.length === 0) {
+    return [
+      'Aucun renouvellement urgent detecte actuellement.',
+      'Le stock est stable pour le moment.',
+    ].join(' ')
+  }
+
+  const lines = urgent.slice(0, 8).map((item) => {
+    const status = formatItemStatus(item)
+    return `- ${item.medicineName}: ${item.quantity} ${item.unit} (seuil ${item.criticalThreshold}, statut ${status})`
+  })
+
+  return [
+    'Medicaments a renouveler en priorite:',
+    ...lines,
+  ].join('\n')
+}
+
+function buildNextRenewalReply(items: InventoryRow[]): string {
+  const scored = items
+    .map((item) => {
+      const daysLeft = getDaysUntilExpiry(item.expiryDate)
+      const status = formatItemStatus(item)
+
+      let priority = 3
+      if (item.quantity === 0) {
+        priority = 0
+      } else if (item.quantity <= item.criticalThreshold) {
+        priority = 1
+      } else if (daysLeft <= 30) {
+        priority = 2
+      }
+
+      return { item, daysLeft, status, priority }
+    })
+    .sort((left, right) => {
+      if (left.priority !== right.priority) {
+        return left.priority - right.priority
+      }
+
+      if (left.daysLeft !== right.daysLeft) {
+        return left.daysLeft - right.daysLeft
+      }
+
+      return left.item.medicineName.localeCompare(right.item.medicineName)
+    })
+
+  const next = scored.slice(0, 5)
+  if (next.length === 0) {
+    return 'Aucun medicament a planifier pour le prochain renouvellement.'
+  }
+
+  const lines = next.map((entry, index) => {
+    let reason = 'prevision'
+    if (entry.priority === 0) {
+      reason = 'rupture'
+    } else if (entry.priority === 1) {
+      reason = 'stock critique'
+    } else if (entry.priority === 2) {
+      reason = `expiration dans ${Math.max(entry.daysLeft, 0)}j`
+    }
+
+    return `${index + 1}. ${entry.item.medicineName}: ${entry.item.quantity} ${entry.item.unit} (${reason})`
+  })
+
+  return ['Prochain renouvellement recommande:', ...lines].join('\n')
+}
+
+function buildExpiringReply(items: InventoryRow[]): string {
+  const expiring = items
+    .map((item) => {
+      const daysLeft = getDaysUntilExpiry(item.expiryDate)
+      return { item, daysLeft }
+    })
+    .filter((entry) => entry.daysLeft <= 30)
+    .sort((left, right) => left.daysLeft - right.daysLeft)
+
+  if (expiring.length === 0) {
+    return 'Aucun medicament n expire dans les 30 prochains jours.'
+  }
+
+  const lines = expiring.slice(0, 8).map((entry) => {
+    const daysLeft = Math.max(entry.daysLeft, 0)
+    return `- ${entry.item.medicineName}: ${entry.item.quantity} ${entry.item.unit}, expiration dans ${daysLeft}j`
+  })
+
+  return ['Medicaments qui expirent bientot:', ...lines].join('\n')
+}
+
+function buildAllergiesReply(message: string, profiles: ProfileRow[]): string {
+  const normalizedMessage = normalizeText(message)
+
+  const targetedProfiles = profiles.filter((profile) => normalizedMessage.includes(normalizeText(profile.name)))
+  const source = targetedProfiles.length > 0 ? targetedProfiles : profiles
+
+  const withAllergies = source.filter((profile) => profile.allergies.trim().length > 0)
+
+  if (withAllergies.length === 0) {
+    if (targetedProfiles.length > 0) {
+      return `Aucune allergie renseignee pour ${targetedProfiles.map((profile) => profile.name).join(', ')}.`
+    }
+
+    return 'Aucune allergie n est renseignee dans les profils.'
+  }
+
+  const lines = withAllergies.map((profile) => `- ${profile.name}: ${profile.allergies}`)
+  return ['Allergies enregistrees:', ...lines].join('\n')
+}
+
+function buildHistoryReply(message: string, movements: MovementRow[]): string {
+  const normalizedMessage = normalizeText(message)
+  const needsTenDays = normalizedMessage.includes('10 derniers jours')
+  const now = Date.now()
+  const tenDaysMs = 10 * 24 * 60 * 60 * 1000
+
+  const filteredMovements = needsTenDays
+    ? movements.filter((movement) => new Date(movement.occurredAt).valueOf() >= (now - tenDaysMs))
+    : movements.slice(0, 8)
+
+  if (filteredMovements.length === 0) {
+    return needsTenDays
+      ? 'Aucun mouvement enregistre sur les 10 derniers jours.'
+      : 'Aucun mouvement disponible.'
+  }
+
+  const lines = filteredMovements.slice(0, 8).map((movement) => {
+    const date = new Date(movement.occurredAt).toLocaleDateString('fr-FR')
+    const profile = movement.profileName ? ` (${movement.profileName})` : ''
+    return `- ${date}: ${movement.type} ${movement.quantityDelta} sur ${movement.medicineName}${profile}`
+  })
+
+  const title = needsTenDays ? 'Mouvements des 10 derniers jours:' : 'Mouvements recents:'
+  return [title, ...lines].join('\n')
+}
+
+function buildMedicineLookupReply(message: string, items: InventoryRow[]): string {
+  const normalizedMessage = normalizeText(message)
+
+  const matches = items.filter((item) => {
+    const name = normalizeText(item.medicineName)
+    if (normalizedMessage.includes(name)) {
+      return true
+    }
+
+    const tokens = name.split(' ').filter((token) => token.length >= 4)
+    return tokens.some((token) => normalizedMessage.includes(token))
+  })
+
+  if (matches.length === 0) {
+    const topNames = items.slice(0, 8).map((item) => item.medicineName).join(', ')
+    return `Je ne trouve pas ce medicament dans votre stock actuel. Medicaments disponibles: ${topNames}.`
+  }
+
+  const lines = matches.slice(0, 6).map((item) => {
+    const status = formatItemStatus(item)
+    return `- ${item.medicineName}: ${item.quantity} ${item.unit} (statut ${status})`
+  })
+
+  return ['Resultat stock en temps reel:', ...lines].join('\n')
+}
+
+function tryBuildDeterministicReply(
+  message: string,
+  items: InventoryRow[],
+  profiles: ProfileRow[],
+  movements: MovementRow[],
+): string | null {
+  const intent = detectDeterministicIntent(message)
+
+  switch (intent) {
+    case 'urgent_renewal':
+      return buildUrgentRenewalReply(items)
+    case 'next_renewal':
+      return buildNextRenewalReply(items)
+    case 'stock_status':
+      return buildStockStatusReply(items)
+    case 'medicine_lookup':
+      return buildMedicineLookupReply(message, items)
+    case 'allergies':
+      return buildAllergiesReply(message, profiles)
+    case 'expiring':
+      return buildExpiringReply(items)
+    case 'history':
+      return buildHistoryReply(message, movements)
+    default:
+      return null
+  }
+}
+
+function getSystemPrompt(contextData: { inventory: string; insights: string; profiles: string; alerts: string; movements: string; stats: string; timestamp: string }): string {
+  return [
+    '🏥 MediStock - Assistant stock',
+    contextData.insights,
+    contextData.inventory,
+    contextData.stats,
+    contextData.profiles,
+    (contextData.alerts ? `⚠️ ${contextData.alerts}` : ''),
+    (contextData.movements ? `${contextData.movements}` : ''),
+    '',
+    '📌 Tu: Assistant stock local.',
+    '✓ Analyse données réelles stock/profils',
+    '✓ Recommande actions renouvellement',
+    '✗ JAMAIS diagnos médical/dosage',
+    '✗ Recommande toujours pharmacien si sensible',
+    '',
+    '💬 Réponse: Direct, français, actionnable, avec détails du contexte au-dessus',
+  ].join('\n')
+}
+
+function stringifyHistory(history: ChatHistoryTurn[] | undefined, message: string, systemPrompt: string) {
   const turns = [...(history ?? []), { role: 'user' as const, content: message }]
 
   const historyText = turns
     .map((turn) => `${turn.role === 'user' ? 'Utilisateur' : 'Assistant'}: ${turn.content}`)
     .join('\n')
 
-  return `${getSystemPrompt()}\n\n${historyText}\nAssistant:`
+  return `${systemPrompt}\n\n${historyText}\nAssistant:`
 }
 
 async function requestJson<T>(url: string, init: RequestInit, timeoutMs: number): Promise<T> {
@@ -336,10 +824,10 @@ function releaseChatSlot() {
   inFlightChatRequests = Math.max(0, inFlightChatRequests - 1)
 }
 
-async function generateWithOllama(model: string, message: string, history: ChatHistoryTurn[] | undefined) {
+async function generateWithOllama(model: string, message: string, history: ChatHistoryTurn[] | undefined, systemPrompt: string) {
   const payload = {
     model,
-    prompt: stringifyHistory(history, message),
+    prompt: stringifyHistory(history, message, systemPrompt),
     stream: false,
     keep_alive: ollamaKeepAlive,
     options: {
@@ -362,13 +850,13 @@ async function generateWithOllama(model: string, message: string, history: ChatH
   return text
 }
 
-async function generateWithLlamaCpp(model: string, message: string, history: ChatHistoryTurn[] | undefined) {
+async function generateWithLlamaCpp(model: string, message: string, history: ChatHistoryTurn[] | undefined, systemPrompt: string) {
   const payload = {
     model,
     temperature: 0.2,
     max_tokens: chatMaxTokens,
     messages: [
-      { role: 'system', content: getSystemPrompt() },
+      { role: 'system', content: systemPrompt },
       ...(history ?? []).map((turn) => ({ role: turn.role, content: turn.content })),
       { role: 'user', content: message },
     ],
@@ -403,9 +891,43 @@ export async function generateLocalChatReply(input: { message: string, history?:
       throw new ChatServiceError('MODEL_UNAVAILABLE', status.reason ?? 'Le modele local est indisponible.')
     }
 
+    // 🚀 FETCH MINIMAL DATA FOR SPEED
+    const { items: inventoryItems } = listInventory('', undefined, { limit: 50 })
+    const profiles = listProfiles()
+    const alerts = listAlerts()
+    const movements = listMovements().slice(0, 5)
+    const dashboardData = getDashboard()
+    const notifications = listNotifications()
+
+    // Categorize inventory for smart analysis
+    const categorizedInventory = categorizeInventory(inventoryItems)
+
+    // Format data - ultra-compact version
+    const contextData = {
+      inventory: formatInventoryContext(inventoryItems),
+      insights: generateSmartInsights(categorizedInventory, alerts, notifications),
+      profiles: formatProfilesContext(profiles),
+      alerts: formatAlertsContext(alerts),
+      movements: formatMovementsContext(movements),
+      stats: formatStatsContext(dashboardData.stats),
+      timestamp: '',
+    }
+
+    const deterministicReply = tryBuildDeterministicReply(input.message, inventoryItems, profiles, movements)
+    if (deterministicReply) {
+      return {
+        reply: deterministicReply,
+        disclaimer: chatDisclaimer,
+        provider: status.provider,
+        model: status.model,
+      }
+    }
+
+    const systemPrompt = getSystemPrompt(contextData)
+
     const reply = status.provider === 'ollama'
-      ? await generateWithOllama(status.model, input.message, input.history)
-      : await generateWithLlamaCpp(status.model, input.message, input.history)
+      ? await generateWithOllama(status.model, input.message, input.history, systemPrompt)
+      : await generateWithLlamaCpp(status.model, input.message, input.history, systemPrompt)
 
     return {
       reply,
